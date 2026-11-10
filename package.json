@@ -1,0 +1,22 @@
+{
+  "name": "trada",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.18.3",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @trada/web",
+    "build": "npm run build --workspace @trada/web",
+    "test": "npm run test --workspace @trada/web",
+    "lint": "npm run lint --workspace @trada/web",
+    "typecheck": "npm run typecheck --workspace @trada/web",
+    "format": "prettier --write .",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2"
+  }
+}

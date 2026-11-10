@@ -1,0 +1,90 @@
+@import 'tailwindcss';
+
+:root {
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  color: var(--sd-text-primary);
+  background: var(--sd-surface-page);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+
+  --sd-navy-950: #061f33;
+  --sd-navy-900: #082d4a;
+  --sd-navy-700: #1e4b73;
+  --sd-teal-700: #08756a;
+  --sd-teal-500: #0e9f8f;
+  --sd-blue-100: #e8f4fd;
+  --sd-cloud-50: #f7f9fc;
+  --sd-white: #ffffff;
+  --sd-slate-900: #182230;
+  --sd-slate-700: #344054;
+  --sd-slate-500: #667085;
+  --sd-slate-300: #d0d5dd;
+  --sd-slate-200: #e4e7ec;
+  --sd-slate-100: #f2f4f7;
+  --sd-green-700: #067647;
+  --sd-green-100: #dcfae6;
+  --sd-amber-700: #b54708;
+  --sd-amber-100: #fef0c7;
+  --sd-red-700: #b42318;
+  --sd-red-100: #fee4e2;
+
+  --sd-action-primary: var(--sd-teal-700);
+  --sd-action-primary-hover: #065e56;
+  --sd-action-secondary: var(--sd-navy-900);
+  --sd-surface-page: var(--sd-cloud-50);
+  --sd-surface-card: var(--sd-white);
+  --sd-surface-soft: var(--sd-blue-100);
+  --sd-text-primary: var(--sd-slate-900);
+  --sd-text-secondary: var(--sd-slate-700);
+  --sd-text-muted: var(--sd-slate-500);
+  --sd-border: var(--sd-slate-200);
+  --sd-focus: #1570ef;
+  --sd-radius-card: 12px;
+  --sd-radius-control: 8px;
+  --sd-radius-modal: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+html {
+  min-width: 320px;
+  background: var(--sd-surface-page);
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--sd-focus) 35%, transparent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

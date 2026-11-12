@@ -46,7 +46,7 @@ export function AppShell({
     <div className="sd-shell">
       <aside className="sd-sidebar" aria-label="Primary navigation">
         <div className="sd-brand">
-          <span className="sd-brand__mark">S</span>
+          <span className="sd-brand__mark">T</span>
           <span className="sd-brand__name">Trada</span>
         </div>
         <nav className="sd-nav">
@@ -78,7 +78,7 @@ export function AppShell({
       <div className="sd-shell__body">
         <header className="sd-topbar">
           <a className="sd-mobile-brand" href="/" aria-label="Trada home">
-            <span className="sd-brand__mark">S</span>
+            <span className="sd-brand__mark">T</span>
             <strong>Trada</strong>
           </a>
           <div className="sd-business">

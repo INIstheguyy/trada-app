@@ -14,12 +14,14 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 
-  --sd-navy-950: #061f33;
-  --sd-navy-900: #082d4a;
-  --sd-navy-700: #1e4b73;
-  --sd-teal-700: #08756a;
-  --sd-teal-500: #0e9f8f;
-  --sd-blue-100: #e8f4fd;
+  /* Trada.com.ng brand palette */
+  --sd-navy-950: #09153a;
+  --sd-navy-900: #0d1b4b;
+  --sd-navy-700: #1e3278;
+  --sd-teal-700: #1a9e36;
+  --sd-teal-500: #22c245;
+  --sd-teal-100: #d9f5e0;
+  --sd-blue-100: #e8f7ec;
   --sd-cloud-50: #f7f9fc;
   --sd-white: #ffffff;
   --sd-slate-900: #182230;
@@ -36,7 +38,7 @@
   --sd-red-100: #fee4e2;
 
   --sd-action-primary: var(--sd-teal-700);
-  --sd-action-primary-hover: #065e56;
+  --sd-action-primary-hover: #148a2d;
   --sd-action-secondary: var(--sd-navy-900);
   --sd-surface-page: var(--sd-cloud-50);
   --sd-surface-card: var(--sd-white);

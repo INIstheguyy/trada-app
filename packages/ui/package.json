@@ -15,5 +15,8 @@
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
     "lucide-react": "^0.545.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.16"
   }
 }

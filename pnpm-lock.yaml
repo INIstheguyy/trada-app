@@ -17,7 +17,7 @@ importers:
       '@reduxjs/toolkit':
         specifier: ^2.9.0
         version: 2.13.0(react-redux@9.3.1(@types/react@19.3.0)(react@19.3.1)(redux@5.0.1))(react@19.3.1)
-      '@sabidesk/ui':
+      '@trada/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       lucide-react:
@@ -104,13 +104,17 @@ importers:
     dependencies:
       '@radix-ui/react-slot':
         specifier: ^1.2.3
-        version: 1.5.0(@types/react@19.3.0)(react@19.3.1)
+        version: 1.5.0(@types/react@19.1.16)(react@19.3.1)
       lucide-react:
         specifier: ^0.545.0
         version: 0.545.0(react@19.3.1)
       react:
         specifier: ^19.0.0
         version: 19.3.1
+    devDependencies:
+      '@types/react':
+        specifier: 19.1.16
+        version: 19.1.16
 
 packages:
 
@@ -1357,6 +1361,9 @@ packages:
     resolution: {integrity: sha512-ZI7bU42mZXXKHn/qNLEw2IrbiINU7X5+vfgdixBHkCNpYWXjKgfQ/P+uyGb5CjOLB9UcnTeg3rylQtV2hym44Q==}
     peerDependencies:
       '@types/react': ^19.3.0
+
+  '@types/react@19.1.16':
+    resolution: {integrity: sha512-WBM/nDbEZmDUORKnh5i1bTnAz6vTohUf9b8esSMu+b24+srbaxa04UbJgWx78CVfNXA20sNu0odEIluZDFdCog==}
 
   '@types/react@19.3.0':
     resolution: {integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==}
@@ -4164,18 +4171,18 @@ snapshots:
 
   '@open-draft/until@2.1.0': {}
 
-  '@radix-ui/react-compose-refs@1.1.5(@types/react@19.3.0)(react@19.3.1)':
+  '@radix-ui/react-compose-refs@1.1.5(@types/react@19.1.16)(react@19.3.1)':
     dependencies:
       react: 19.3.1
     optionalDependencies:
-      '@types/react': 19.3.0
+      '@types/react': 19.1.16
 
-  '@radix-ui/react-slot@1.5.0(@types/react@19.3.0)(react@19.3.1)':
+  '@radix-ui/react-slot@1.5.0(@types/react@19.1.16)(react@19.3.1)':
     dependencies:
-      '@radix-ui/react-compose-refs': 1.1.5(@types/react@19.3.0)(react@19.3.1)
+      '@radix-ui/react-compose-refs': 1.1.5(@types/react@19.1.16)(react@19.3.1)
       react: 19.3.1
     optionalDependencies:
-      '@types/react': 19.3.0
+      '@types/react': 19.1.16
 
   '@reduxjs/toolkit@2.13.0(react-redux@9.3.1(@types/react@19.3.0)(react@19.3.1)(redux@5.0.1))(react@19.3.1)':
     dependencies:
@@ -4464,6 +4471,10 @@ snapshots:
   '@types/react-dom@19.3.0(@types/react@19.3.0)':
     dependencies:
       '@types/react': 19.3.0
+
+  '@types/react@19.1.16':
+    dependencies:
+      csstype: 3.2.3
 
   '@types/react@19.3.0':
     dependencies:

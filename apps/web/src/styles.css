@@ -236,7 +236,7 @@
   padding: 18px;
   color: white;
   border-color: var(--sd-navy-900);
-  background: linear-gradient(130deg, var(--sd-navy-950), var(--sd-navy-900) 65%, #0b5262);
+  background: linear-gradient(130deg, var(--sd-navy-950), var(--sd-navy-900) 65%, #0d3a1a);
   display: flex;
   gap: 13px;
   overflow: hidden;
@@ -256,7 +256,7 @@
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  color: #80e4da;
+  color: #74e88a;
   background: rgba(255, 255, 255, 0.09);
   display: grid;
   place-items: center;
@@ -286,7 +286,7 @@
 }
 .briefing .sd-badge {
   color: #d7fff9;
-  background: rgba(14, 159, 143, 0.2);
+  background: rgba(26, 158, 54, 0.2);
 }
 .text-action {
   min-height: 34px;
@@ -301,7 +301,7 @@
   cursor: pointer;
 }
 .briefing .text-action {
-  color: #8ceddf;
+  color: #74e88a;
 }
 .section-heading,
 .panel__heading {
@@ -610,7 +610,7 @@
   height: 8px;
   border-radius: 50%;
   background: var(--sd-teal-500);
-  box-shadow: 0 0 0 4px #e8f8f5;
+  box-shadow: 0 0 0 4px #d9f5de;
 }
 .activity-item time {
   color: var(--sd-text-muted);
@@ -685,7 +685,7 @@
   padding: 28px 22px;
   color: white;
   background:
-    radial-gradient(circle at 90% 12%, rgba(14, 159, 143, 0.27), transparent 30%),
+    radial-gradient(circle at 90% 12%, rgba(26, 158, 54, 0.27), transparent 30%),
     linear-gradient(145deg, var(--sd-navy-950), var(--sd-navy-900));
   display: flex;
   flex-direction: column;
@@ -702,7 +702,7 @@
   font-size: 19px;
 }
 .auth-intro .eyebrow {
-  color: #87e4d9;
+  color: #74e88a;
 }
 .auth-intro h1 {
   max-width: 580px;
@@ -728,7 +728,7 @@
   font-size: 13px;
 }
 .auth-trust svg {
-  color: #87e4d9;
+  color: #74e88a;
   flex: none;
 }
 .auth-form-panel {
@@ -1252,7 +1252,7 @@
   height: 34px;
   border-radius: 9px;
   color: var(--sd-teal-700);
-  background: #e8f8f5;
+  background: #e1f7e5;
   display: grid;
   place-items: center;
 }
@@ -1765,7 +1765,7 @@
   }
   .sd-nav__item.is-active {
     color: white;
-    background: rgba(14, 159, 143, 0.23);
+    background: rgba(26, 158, 54, 0.23);
   }
   .sd-sidebar__profile {
     margin-top: auto;

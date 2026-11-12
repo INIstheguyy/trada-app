@@ -20,8 +20,8 @@ export default defineConfig({
       manifest: {
         name: 'Trada',
         short_name: 'Trada',
-        description: 'Understand and control your business.',
-        theme_color: '#082d4a',
+        description: 'Manage, Sell and Grow your business.',
+        theme_color: '#0d1b4b',
         background_color: '#f7f9fc',
         display: 'standalone',
         start_url: '/',

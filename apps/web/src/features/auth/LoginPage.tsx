@@ -48,7 +48,7 @@ export function LoginPage() {
         sessionEstablished({
           accessToken: result.accessToken,
           refreshToken: result.refreshToken,
-          user: result.user,
+          user: result.user ?? null,
         }),
       );
 

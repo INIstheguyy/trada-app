@@ -24,13 +24,39 @@ const userSchema = z.object({
   updatedAt: z.string().optional(),
 });
 
-const loginDataSchema = z.object({
-  accessToken: z.string(),
-  refreshToken: z.string(),
-  user: userSchema.omit({ role: true }).extend({ role: z.string().default('user') }),
-});
+const loginDataSchema = z
+  .object({
+    accessToken: z.string().optional(),
+    token: z.string().optional(),
+    refreshToken: z.string(),
+    user: userSchema
+      .omit({ role: true })
+      .extend({ role: z.string().default('user') })
+      .optional(),
+  })
+  .refine((data) => data.accessToken || data.token, {
+    message: 'Login response did not include an access token',
+  })
+  .transform(({ accessToken, token, refreshToken, user }) => ({
+    accessToken: accessToken ?? token!,
+    refreshToken,
+    user,
+  }));
 
-const refreshDataSchema = z.object({ accessToken: z.string() });
+const refreshDataSchema = z
+  .object({ accessToken: z.string().optional(), token: z.string().optional() })
+  .refine((data) => data.accessToken || data.token, {
+    message: 'Refresh response did not include an access token',
+  })
+  .transform(({ accessToken, token }) => ({ accessToken: accessToken ?? token! }));
+
+export function parseLoginResponse(response: unknown) {
+  return apiEnvelopeSchema(loginDataSchema).parse(response).data;
+}
+
+export function parseRefreshResponse(response: unknown) {
+  return apiEnvelopeSchema(refreshDataSchema).parse(response).data;
+}
 
 export type LoginRequest = { email: string; password: string };
 export type RegisterRequest = {
@@ -221,7 +247,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
     );
 
     try {
-      const refreshed = apiEnvelopeSchema(refreshDataSchema).parse(refreshResult.data).data;
+      const refreshed = parseRefreshResponse(refreshResult.data);
       apiContext.dispatch(accessTokenUpdated(refreshed.accessToken));
       result = await rawBaseQuery(args, apiContext, extraOptions);
     } catch {
@@ -243,8 +269,7 @@ export const api = createApi({
     }),
     login: builder.mutation<LoginData, LoginRequest>({
       query: (credentials) => ({ url: '/auth/login', method: 'POST', body: credentials }),
-      transformResponse: (response: unknown) =>
-        apiEnvelopeSchema(loginDataSchema).parse(response).data,
+      transformResponse: parseLoginResponse,
     }),
     getProfile: builder.query<ProfileData, void>({
       query: () => '/auth/me',

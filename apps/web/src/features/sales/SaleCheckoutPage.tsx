@@ -1,4 +1,4 @@
-import { Button, Surface } from '@trada/ui';
+import { Alert, Button, FormField, Input, PageHeader, Select, Surface, Textarea } from '@trada/ui';
 import { ArrowLeft, Minus, Plus, ReceiptText, ShoppingCart, Trash2 } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -15,7 +15,12 @@ type CartItem = { product: Product; quantity: number; unitPrice: number; discoun
 
 export function SaleCheckoutPage() {
   const navigate = useNavigate();
-  const { data: productsData, isLoading: isLoadingProducts } = useGetProductsQuery({
+  const {
+    data: productsData,
+    isLoading: isLoadingProducts,
+    isError: productsFailed,
+    refetch: refetchProducts,
+  } = useGetProductsQuery({
     isActive: true,
     page: 1,
     limit: 100,
@@ -122,29 +127,36 @@ export function SaleCheckoutPage() {
 
   return (
     <div className="sales-page checkout-page">
-      <div className="page-heading">
-        <div>
-          <Link className="back-link" to="/sales">
-            <ArrowLeft aria-hidden="true" size={16} /> Sales
-          </Link>
-          <h1>Record a sale</h1>
-          <p>Review products, payment and customer balance before saving.</p>
-        </div>
-      </div>
+      <Link className="back-link" to="/sales">
+        <ArrowLeft aria-hidden="true" size={16} /> Sales
+      </Link>
+      <PageHeader
+        eyebrow="New receipt"
+        title="Record a sale"
+        description="Build the cart, confirm payment received and review any outstanding balance before saving."
+      />
       <form className="checkout-layout" onSubmit={handleSubmit}>
         <div className="checkout-main">
-          {error && (
-            <div className="auth-error" role="alert">
-              {error}
-            </div>
-          )}
+          {error && <Alert tone="error">{error}</Alert>}
           <Surface className="checkout-section">
             <div className="form-section-heading">
               <h2>Products</h2>
               <p>Stock is deducted only after the backend confirms the sale.</p>
             </div>
+            {productsFailed && (
+              <Alert tone="warning">
+                Products could not be loaded.{' '}
+                <button
+                  className="text-action"
+                  type="button"
+                  onClick={() => void refetchProducts()}
+                >
+                  Try again
+                </button>
+              </Alert>
+            )}
             <div className="product-picker">
-              <select
+              <Select
                 aria-label="Choose product"
                 value={selectedProductId}
                 onChange={(event) => setSelectedProductId(event.target.value)}
@@ -154,12 +166,16 @@ export function SaleCheckoutPage() {
                   {isLoadingProducts ? 'Loading products…' : 'Choose a product'}
                 </option>
                 {productsData?.products.map((product) => (
-                  <option key={product.id} value={product.id}>
+                  <option
+                    key={product.id}
+                    value={product.id}
+                    disabled={product.type === 'inventory_based' && product.quantity <= 0}
+                  >
                     {product.name} · {formatNaira.format(product.sellingPrice)} · {product.quantity}{' '}
                     {product.unit}
                   </option>
                 ))}
-              </select>
+              </Select>
               <Button
                 type="button"
                 variant="secondary"
@@ -224,6 +240,7 @@ export function SaleCheckoutPage() {
                     <label>
                       <span>Unit price</span>
                       <input
+                        aria-label={`${item.product.name} unit price`}
                         type="number"
                         min="0"
                         value={item.unitPrice}
@@ -235,6 +252,7 @@ export function SaleCheckoutPage() {
                     <label>
                       <span>Item discount</span>
                       <input
+                        aria-label={`${item.product.name} item discount`}
                         type="number"
                         min="0"
                         value={item.discountAmount}
@@ -289,14 +307,14 @@ export function SaleCheckoutPage() {
                 onChange={setCustomerEmail}
                 type="email"
               />
-              <label className="product-field product-field--wide">
-                <span>Notes</span>
-                <textarea
+              <FormField className="product-form-field--wide" htmlFor="sale-notes" label="Notes">
+                <Textarea
+                  id="sale-notes"
                   rows={3}
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                 />
-              </label>
+              </FormField>
             </div>
           </Surface>
         </div>
@@ -308,9 +326,9 @@ export function SaleCheckoutPage() {
               <p>Revenue and money received are recorded separately.</p>
             </div>
             <div className="checkout-payment">
-              <label className="product-field">
-                <span>Payment method</span>
-                <select
+              <FormField htmlFor="payment-method" label="Payment method" required>
+                <Select
+                  id="payment-method"
                   value={paymentMethod}
                   onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
                 >
@@ -319,18 +337,24 @@ export function SaleCheckoutPage() {
                   <option value="transfer">Transfer</option>
                   <option value="credit">Credit</option>
                   <option value="split">Split</option>
-                </select>
-              </label>
-              <label className="product-field">
-                <span>Amount paid</span>
-                <input
+                </Select>
+              </FormField>
+              <FormField
+                htmlFor="amount-paid"
+                label="Amount received"
+                required
+                hint="Record only money already received."
+              >
+                <Input
+                  id="amount-paid"
                   type="number"
                   min="0"
                   step="0.01"
                   value={amountPaid}
                   onChange={(event) => setAmountPaid(Number(event.target.value))}
+                  aria-describedby="amount-paid-hint"
                 />
-              </label>
+              </FormField>
               <button
                 className="text-action"
                 type="button"
@@ -338,26 +362,26 @@ export function SaleCheckoutPage() {
               >
                 Mark fully paid
               </button>
-              <label className="product-field">
-                <span>Sale discount</span>
-                <input
+              <FormField htmlFor="sale-discount" label="Sale discount">
+                <Input
+                  id="sale-discount"
                   type="number"
                   min="0"
                   step="0.01"
                   value={discountAmount}
                   onChange={(event) => setDiscountAmount(Number(event.target.value))}
                 />
-              </label>
-              <label className="product-field">
-                <span>Tax</span>
-                <input
+              </FormField>
+              <FormField htmlFor="sale-tax" label="Tax">
+                <Input
+                  id="sale-tax"
                   type="number"
                   min="0"
                   step="0.01"
                   value={taxAmount}
                   onChange={(event) => setTaxAmount(Number(event.target.value))}
                 />
-              </label>
+              </FormField>
             </div>
           </Surface>
           <Surface className="sale-totals">
@@ -414,10 +438,10 @@ function CheckoutField({
   onChange: (value: string) => void;
   type?: string;
 }) {
+  const id = `customer-${label.toLowerCase().replaceAll(' ', '-')}`;
   return (
-    <label className="product-field">
-      <span>{label}</span>
-      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
-    </label>
+    <FormField htmlFor={id} label={label}>
+      <Input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+    </FormField>
   );
 }

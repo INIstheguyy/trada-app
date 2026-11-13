@@ -6,6 +6,7 @@ export type Action =
   | 'sales:analytics'
   | 'approval:review'
   | 'margin:view'
+  | 'business:update'
   | 'product:view'
   | 'product:create'
   | 'product:update'
@@ -20,6 +21,7 @@ const permissions: Record<Role, ReadonlySet<Action>> = {
     'sale:view',
     'sale:create',
     'sales:analytics',
+    'business:update',
     'product:view',
     'product:create',
     'product:update',
@@ -32,6 +34,7 @@ const permissions: Record<Role, ReadonlySet<Action>> = {
     'sales:analytics',
     'approval:review',
     'margin:view',
+    'business:update',
     'product:view',
     'product:create',
     'product:update',

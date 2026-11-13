@@ -26,6 +26,7 @@ describe('authentication state', () => {
     expect(can(role, 'dashboard:view')).toBe(true);
     expect(can(role, 'sale:create')).toBe(true);
     expect(can(role, 'sale:cancel')).toBe(false);
+    expect(can(role, 'business:update')).toBe(true);
     expect(can(role, 'product:create')).toBe(true);
     expect(can(role, 'product:delete')).toBe(false);
     expect(can(role, 'approval:review')).toBe(false);

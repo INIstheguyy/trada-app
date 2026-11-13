@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import '../styles/components.css';
 
 :root {
   font-family:
@@ -14,15 +15,15 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 
-  /* Trada.com.ng brand palette */
-  --sd-navy-950: #09153a;
-  --sd-navy-900: #0d1b4b;
-  --sd-navy-700: #1e3278;
-  --sd-teal-700: #1a9e36;
-  --sd-teal-500: #22c245;
-  --sd-teal-100: #d9f5e0;
-  --sd-blue-100: #e8f7ec;
-  --sd-cloud-50: #f7f9fc;
+  /* Trada logo-led palette: sampled navy/teal with accessible UI variants. */
+  --sd-navy-950: #001f38;
+  --sd-navy-900: #002848;
+  --sd-navy-700: #174d69;
+  --sd-teal-700: #007a73;
+  --sd-teal-500: #009890;
+  --sd-teal-100: #d9f3f1;
+  --sd-blue-100: #eaf5f6;
+  --sd-cloud-50: #f7fafb;
   --sd-white: #ffffff;
   --sd-slate-900: #182230;
   --sd-slate-700: #344054;
@@ -38,7 +39,7 @@
   --sd-red-100: #fee4e2;
 
   --sd-action-primary: var(--sd-teal-700);
-  --sd-action-primary-hover: #148a2d;
+  --sd-action-primary-hover: #00665f;
   --sd-action-secondary: var(--sd-navy-900);
   --sd-surface-page: var(--sd-cloud-50);
   --sd-surface-card: var(--sd-white);
@@ -47,10 +48,31 @@
   --sd-text-secondary: var(--sd-slate-700);
   --sd-text-muted: var(--sd-slate-500);
   --sd-border: var(--sd-slate-200);
-  --sd-focus: #1570ef;
+  --sd-focus: #007a73;
   --sd-radius-card: 12px;
   --sd-radius-control: 8px;
   --sd-radius-modal: 16px;
+  --sd-shadow-xs: 0 1px 2px rgba(9, 21, 58, 0.05);
+  --sd-shadow-sm: 0 6px 18px rgba(9, 21, 58, 0.08);
+  --sd-control-height: 44px;
+  --sd-content-max: 1440px;
+  --sd-space-1: 4px;
+  --sd-space-2: 8px;
+  --sd-space-3: 12px;
+  --sd-space-4: 16px;
+  --sd-space-5: 20px;
+  --sd-space-6: 24px;
+  --sd-space-8: 32px;
+  --sd-space-10: 40px;
+  --sd-text-xs: 0.75rem;
+  --sd-text-sm: 0.875rem;
+  --sd-text-md: 1rem;
+  --sd-text-lg: 1.25rem;
+  --sd-text-xl: clamp(1.75rem, 4vw, 2.25rem);
+  --sd-leading-tight: 1.2;
+  --sd-leading-body: 1.55;
+  --sd-motion-fast: 160ms;
+  --sd-focus-ring: 0 0 0 3px color-mix(in srgb, var(--sd-focus) 18%, transparent);
 }
 
 * {

@@ -1,4 +1,4 @@
-import { Badge, Button, Surface } from '@trada/ui';
+import { Alert, Badge, Button, EmptyState, Input, PageHeader, Select, Surface } from '@trada/ui';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -7,28 +7,42 @@ import {
   PackagePlus,
   RefreshCw,
   Search,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { useAppSelector } from '../../app/hooks';
 import { can, normalizeRole } from '../../app/permissions';
+import {
+  useGetLowStockProductsQuery,
+  useGetProductsQuery,
+  type ProductListParams,
+  type ProductType,
+} from '../../lib/api';
 import { formatNaira } from '../../lib/formatters';
-import { useGetLowStockProductsQuery, useGetProductsQuery } from '../../lib/api';
+
+type StatusFilter = 'all' | 'active' | 'inactive';
 
 export function ProductListPage() {
   const user = useAppSelector((state) => state.auth.user);
   const role = normalizeRole(user?.role ?? 'user');
   const [draftSearch, setDraftSearch] = useState('');
   const [search, setSearch] = useState('');
+  const [type, setType] = useState<ProductType | ''>('');
+  const [status, setStatus] = useState<StatusFilter>('all');
   const [page, setPage] = useState(1);
-  const { data, isLoading, isError, isFetching, refetch } = useGetProductsQuery({
-    search,
+  const query: ProductListParams = {
+    search: search || undefined,
+    type: type || undefined,
+    isActive: status === 'all' ? undefined : status === 'active',
     page,
     limit: 10,
     sortBy: 'createdAt',
     sortOrder: 'DESC',
-  });
-  const { data: lowStock = [] } = useGetLowStockProductsQuery();
+  };
+  const { data, isLoading, isError, isFetching, refetch } = useGetProductsQuery(query);
+  const lowStock = useGetLowStockProductsQuery();
+  const hasFilters = Boolean(search || type || status !== 'all');
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -36,50 +50,72 @@ export function ProductListPage() {
     setSearch(draftSearch.trim());
   }
 
+  function clearFilters() {
+    setDraftSearch('');
+    setSearch('');
+    setType('');
+    setStatus('all');
+    setPage(1);
+  }
+
   return (
     <div className="products-page">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">Inventory</p>
-          <h1>Products</h1>
-          <p>Manage prices, stock levels and the items your business sells.</p>
-        </div>
-        {can(role, 'product:create') && (
-          <Button asChild>
-            <Link to="/products/new">
-              <PackagePlus aria-hidden="true" size={18} /> Add product
-            </Link>
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        eyebrow="Inventory"
+        title="Products"
+        description="Find products, review stock levels and keep selling details accurate."
+        actions={
+          can(role, 'product:create') ? (
+            <Button asChild>
+              <Link to="/products/new">
+                <PackagePlus aria-hidden="true" size={18} /> Add product
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      />
 
-      {lowStock.length > 0 && (
+      {lowStock.isError ? (
+        <Alert
+          tone="warning"
+          icon={<AlertTriangle aria-hidden="true" size={18} />}
+          className="inventory-alert"
+        >
+          <strong>Low-stock status is unavailable.</strong>
+          <span>Your product list is still available. Retry the stock check when ready.</span>
+          <button type="button" onClick={() => void lowStock.refetch()}>
+            Retry stock check
+          </button>
+        </Alert>
+      ) : lowStock.data && lowStock.data.length > 0 ? (
         <Surface className="low-stock-strip" aria-labelledby="low-stock-heading">
           <span className="low-stock-strip__icon">
             <AlertTriangle aria-hidden="true" size={20} />
           </span>
-          <div>
+          <div className="low-stock-strip__copy">
             <h2 id="low-stock-heading">
-              {lowStock.length} {lowStock.length === 1 ? 'product is' : 'products are'} running low
+              {lowStock.data.length}{' '}
+              {lowStock.data.length === 1 ? 'product needs' : 'products need'} attention
             </h2>
             <p>
-              {lowStock
+              {lowStock.data
                 .slice(0, 3)
                 .map((product) => `${product.name} (${product.quantity} ${product.unit})`)
                 .join(' · ')}
             </p>
           </div>
+          <span className="low-stock-strip__label">At or below threshold</span>
         </Surface>
-      )}
+      ) : null}
 
       <Surface className="products-panel">
         <div className="products-toolbar">
           <form className="products-search" onSubmit={handleSearch} role="search">
             <Search aria-hidden="true" size={18} />
-            <input
+            <Input
               aria-label="Search products"
               type="search"
-              placeholder="Search by name, SKU or barcode"
+              placeholder="Search name, SKU or barcode"
               value={draftSearch}
               onChange={(event) => setDraftSearch(event.target.value)}
             />
@@ -88,37 +124,89 @@ export function ProductListPage() {
           <button
             className="icon-button"
             type="button"
-            onClick={() => refetch()}
+            onClick={() => void refetch()}
             aria-label="Refresh products"
           >
             <RefreshCw aria-hidden="true" size={17} className={isFetching ? 'sd-spin' : ''} />
           </button>
         </div>
 
+        <div className="inventory-filters" aria-label="Product filters">
+          <span className="inventory-filters__label">
+            <SlidersHorizontal aria-hidden="true" size={16} /> Filters
+          </span>
+          <Select
+            aria-label="Filter by product type"
+            value={type}
+            onChange={(event) => {
+              setType(event.target.value as ProductType | '');
+              setPage(1);
+            }}
+          >
+            <option value="">All product types</option>
+            <option value="inventory_based">Inventory based</option>
+            <option value="input_based">Input based / service</option>
+          </Select>
+          <Select
+            aria-label="Filter by product status"
+            value={status}
+            onChange={(event) => {
+              setStatus(event.target.value as StatusFilter);
+              setPage(1);
+            }}
+          >
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </Select>
+          {hasFilters && (
+            <button className="inventory-filters__clear" type="button" onClick={clearFilters}>
+              Clear filters
+            </button>
+          )}
+        </div>
+
+        {data && !isLoading && (
+          <div className="inventory-results" role="status">
+            <span>
+              {data.pagination.total} {data.pagination.total === 1 ? 'product' : 'products'} found
+            </span>
+            {search && <span>Search: “{search}”</span>}
+          </div>
+        )}
+
         {isLoading ? (
           <ProductListSkeleton />
         ) : isError ? (
-          <div className="products-feedback" role="alert">
-            <Boxes aria-hidden="true" size={28} />
-            <h2>We couldn’t load your products</h2>
-            <p>Check your connection and try again.</p>
-            <Button onClick={() => refetch()}>Try again</Button>
-          </div>
+          <EmptyState
+            className="products-feedback"
+            icon={<Boxes aria-hidden="true" size={28} />}
+            title="We couldn’t load your products"
+            description="Check your connection and try again."
+            action={<Button onClick={() => void refetch()}>Try again</Button>}
+          />
         ) : data?.products.length === 0 ? (
-          <div className="products-feedback">
-            <Boxes aria-hidden="true" size={28} />
-            <h2>{search ? 'No matching products' : 'Add your first product'}</h2>
-            <p>
-              {search
-                ? 'Try another name, SKU or barcode.'
-                : 'Products you add will appear here with their price and stock level.'}
-            </p>
-            {!search && can(role, 'product:create') && (
-              <Button asChild>
-                <Link to="/products/new">Add product</Link>
-              </Button>
-            )}
-          </div>
+          <EmptyState
+            className="products-feedback"
+            icon={<Boxes aria-hidden="true" size={28} />}
+            title={hasFilters ? 'No matching products' : 'Add your first product'}
+            description={
+              hasFilters
+                ? 'Clear a filter or try another name, SKU or barcode.'
+                : 'Products you add will appear here with their price and stock level.'
+            }
+            action={
+              hasFilters ? (
+                <Button variant="secondary" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              ) : can(role, 'product:create') ? (
+                <Button asChild>
+                  <Link to="/products/new">Add product</Link>
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
           <>
             <div className="product-table" role="table" aria-label="Products">
@@ -133,36 +221,39 @@ export function ProductListPage() {
                 const isLow = product.quantity <= product.stockThreshold;
                 return (
                   <div className="product-table__row" role="row" key={product.id}>
-                    <div className="product-cell product-cell--name">
+                    <div className="product-cell product-cell--name" role="cell">
                       <span className="product-image-placeholder">
                         {product.name.charAt(0).toUpperCase()}
                       </span>
                       <span>
                         <strong>{product.name}</strong>
-                        <small>{product.sku || product.category || 'No SKU'}</small>
+                        <small>{product.sku || product.category || 'No SKU recorded'}</small>
                       </span>
                     </div>
-                    <div className="product-cell" data-label="Price">
+                    <div className="product-cell" data-label="Price" role="cell">
                       <strong>{formatNaira.format(product.sellingPrice)}</strong>
-                      {product.discountPrice && (
+                      {product.discountPrice != null && (
                         <small>Offer {formatNaira.format(product.discountPrice)}</small>
                       )}
                     </div>
-                    <div className="product-cell" data-label="Stock">
+                    <div className="product-cell" data-label="Stock" role="cell">
                       <strong>
                         {product.quantity} {product.unit}
                       </strong>
                       <small>Alert at {product.stockThreshold}</small>
                     </div>
-                    <div className="product-cell" data-label="Status">
-                      <Badge className={isLow ? 'sd-badge--warning' : ''}>
-                        {isLow ? 'Low stock' : product.isActive ? 'Active' : 'Inactive'}
-                      </Badge>
+                    <div className="product-cell" data-label="Status" role="cell">
+                      <div className="product-statuses">
+                        <Badge className={isLow ? 'sd-badge--warning' : ''}>
+                          {isLow ? 'Low stock' : 'Stock okay'}
+                        </Badge>
+                        {!product.isActive && <Badge>Inactive</Badge>}
+                      </div>
                     </div>
                     <Link
                       className="product-row-link"
                       to={`/products/${product.id}`}
-                      aria-label={`View ${product.name}`}
+                      aria-label={`Edit ${product.name}`}
                     >
                       <ArrowRight aria-hidden="true" size={18} />
                     </Link>
@@ -172,7 +263,7 @@ export function ProductListPage() {
             </div>
 
             {data && data.pagination.totalPages > 1 && (
-              <div className="pagination">
+              <nav className="pagination" aria-label="Product pages">
                 <button
                   type="button"
                   disabled={!data.pagination.hasPrevPage}
@@ -190,7 +281,7 @@ export function ProductListPage() {
                 >
                   Next <ArrowRight aria-hidden="true" size={16} />
                 </button>
-              </div>
+              </nav>
             )}
           </>
         )}

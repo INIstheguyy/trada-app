@@ -18,27 +18,17 @@ If `corepack enable` fails with an `EPERM` error, dependencies are already insta
 npm run dev
 ```
 
-Open `http://localhost:5173`. By default, real authentication and API requests use the backend documented at `http://localhost:3002/api/v1`; Vite proxies `/api` to that address during development.
+Open `http://localhost:5173`. Local development currently connects directly to the production API at `https://api.trada.com.ng/api/v1` because a separate backend development environment is not available.
 
-### Demo mode
+### API environment
 
-Development builds provide an isolated owner demo on the login screen. Click **Use demo account**, or enter:
-
-- Email: `demo@trada.local`
-- Password: `demo1234`
-
-The demo uses an in-memory implementation of the documented product and sales routes. Mutations work for route testing, but reset when the development server/application runtime restarts. Demo interception is development-only and does not replace live-backend verification.
-
-### Live API mode
-
-Sign in with a non-demo account to use the proxied backend. To use another API environment, copy `apps/web/.env.example` to `apps/web/.env.local`, set `VITE_API_BASE_URL`, and restart Vite. The value must include the API prefix:
+The production API is the default in source and in `apps/web/.env.example`. To point the frontend at a future backend environment, copy the example to `apps/web/.env.local`, change `VITE_API_BASE_URL`, and restart Vite. The value must include the API prefix and should not end with a slash:
 
 ```env
-VITE_API_BASE_URL=https://api.example.com/api/v1
+VITE_API_BASE_URL=https://api.trada.com.ng/api/v1
 ```
 
-The current backend contract does not yet provide business membership or production RBAC. Live accounts therefore receive the documented generic `user` role and the provisional frontend permissions recorded in the PRD.
-
+Use test accounts and non-sensitive records during local development because requests are sent to production. Live accounts currently receive the documented generic `user` role and the provisional frontend permissions recorded in the PRD.
 ## Commands
 
 - `npm run dev` — start the web app

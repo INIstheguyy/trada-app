@@ -1,4 +1,13 @@
 export { Badge } from './primitives/Badge';
 export { Button } from './primitives/Button';
+export { Alert } from './primitives/Alert';
+export { FormField } from './primitives/FormField';
+export { Input } from './primitives/Input';
+export { Select } from './primitives/Select';
 export { Surface } from './primitives/Surface';
+export { Textarea } from './primitives/Textarea';
+export { EmptyState } from './patterns/EmptyState';
+export { PageHeader } from './patterns/PageHeader';
+export { StatCard } from './patterns/StatCard';
 export { AppShell } from './layouts/AppShell';
+export type { AppShellNavigationItem } from './layouts/AppShell';

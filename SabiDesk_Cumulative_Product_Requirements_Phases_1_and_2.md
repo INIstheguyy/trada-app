@@ -2,7 +2,7 @@
 
 **Coverage:** Phase One and Phase Two, with explicitly separated future vision  
 **Document type:** Product requirements context and business/product analysis — **not a technical requirements specification**  
-**Version:** 1.1 | **Prepared:** 3 November 2026 | **Implementation status updated:** 12 November 2026  
+**Version:** 1.1 | **Prepared:** 3 November 2026 | **Implementation status updated:** 13 November 2026  
 **Intended use:** Source context for a separate technical requirements, design system, UX, and engineering planning exercise.
 
 > **Important:** This compilation consolidates the decisions, product directions, concepts and suggestions developed in the Trada conversations. A feature being discussed does not mean it has been approved, built, or committed to Phase One. The Phase One/Phase Two split below is a **recommended consolidation** of our evolving scope, not a formally signed-off release contract. This distinction matters because previous conversations used terms such as MVP, V2, “next,” and “later” at different times.
@@ -772,9 +772,7 @@ At the end of every substantive delivery session, the team should update:
 
 ## 36. Current implementation status
 
-### 36.1 Frontend status as of 4 November 2026
-
-### 36.1 Frontend status as of 10 November 2026
+### 36.1 Frontend status as of 13 November 2026
 
 | Capability                        | Status                           | Current evidence / limitation                                                                                                                                                                                                                                                                                                            |
 | --------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -790,7 +788,8 @@ At the end of every substantive delivery session, the team should update:
 | Loading and error feedback        | **Implemented and verified**     | Dashboard sources load and fail independently, with partial-data disclosure and per-panel retries. Mutation feedback consistently distinguishes authentication, authorization, connectivity, malformed-response and backend business errors.                                                                                             |
 | Frontend permission helper        | **Partially defined**            | Action-based `can()` guards protect routes and actions. The backend's generic `user` can currently view/create sales and view sales analytics, plus view/create/update products; sale cancellation and product deletion remain owner-only. Final owner, manager and staff mappings remain blocked by the production permission contract. |
 | Authentication and session        | **Implemented and verified**     | Typed registration, login and profile integration plus session restoration, protected routing, logout and automatic access-token refresh are implemented. A live backend handshake with real credentials remains to be verified.                                                                                                         |
-| Development demo environment      | **Implemented and verified**     | Development builds expose an owner-scoped demo login backed by in-memory product, sale, stock and analytics behavior. It is test tooling, is excluded from the production UI and resets when the dev server restarts.                                                                                                                    |
+| Business onboarding and settings  | **Implemented and verified**     | Authenticated users resolve or create their owned business workspace, operational routes require a business, and business identity is editable. Publication remains unavailable pending authorization rules.                                                                                                                             |
+| Development demo environment      | **Removed**                      | The demo login and in-memory API adapter were removed when local development switched to the shared production API. Local work must use dedicated test accounts and non-sensitive records.                                                                                                                                               |
 | Products and low-stock alerts     | **Implemented and verified**     | Searchable/paginated list, low-stock summary, create, detail/edit and guarded delete routes are implemented against the documented contract. Live backend testing was intentionally deferred.                                                                                                                                            |
 | Sales and sales analytics         | **Implemented and verified**     | Protected checkout, filtered/paginated history, detail, guarded cancellation/restock and analytics are implemented against the documented contract. Revenue, received amount and balance due remain distinct. Live backend testing was intentionally deferred.                                                                           |
 | Full production RBAC              | **Blocked by decision/contract** | Backend documentation exposes a generic `user` role but no staff membership, permission, branch, approval or authorization-denied contract.                                                                                                                                                                                              |
@@ -1132,3 +1131,339 @@ These items require clarification before the frontend treats the backend as the 
 **Integration limitation:** The corrected behavior is covered by contract tests and a production build, but still requires a deployed smoke test against the live API. In particular, `/auth/me`, authenticated route access and the refresh endpoint must be confirmed after redeployment.
 
 **Next session target:** Commit and deploy this fix, rotate the exposed credentials, then smoke-test login, browser refresh, protected routes, logout and automatic token refresh in production.
+
+### Session 011 — Business onboarding endpoint review and integration design
+
+**Date:** 13 November 2026  
+**Outcome:** The received business endpoint family has been mapped to the Phase One owner-onboarding journey and the current frontend architecture.
+
+**Confirmed implementation scope:**
+
+- Resolve the authenticated user's business with `GET /businesses/me` during protected-app bootstrap.
+- Treat a successful business response as an established workspace and the documented business-not-found response as the onboarding state.
+- Add an authenticated business-creation flow using `POST /businesses`, keeping `isLive` false during initial setup.
+- Use `PATCH /businesses/:id` for later business-settings edits and hydrate the application shell from the returned business rather than fixture identity.
+- Preserve business data as RTK Query server state, add business cache tags, and gate operational routes until authentication, profile and business resolution finish.
+- Extend development demo behavior and contract tests for no-business, existing-business, creation, update, authentication-expiry and error states.
+
+**Backend clarifications received:**
+
+- Business creation atomically establishes the authenticated user as the business owner.
+- `/auth/me` continues to return the generic `user` role for now; this label must not be treated as the finalized RBAC role.
+- Ownership enforcement is confirmed for business retrieval and update by ID.
+- Staff membership support is under backend development.
+- Authorization for changing `isLive` remains unresolved, so initial onboarding will keep it false and will not expose a publication control.
+
+**Remaining contract and product gaps:**
+
+- Category values, currency codes, industry taxonomy, field-level validation codes and publication rules for `isLive` require agreement.
+- Returning `403` for an invalid JWT conflicts with the frontend's authorization handling and may leave an invalid session active; authentication-status semantics must be aligned.
+- The five required creation fields limit the PRD's progressive-setup goal, and agent-assisted activation remains unsupported by the received endpoints.
+- Staff invitations, membership payloads and the final RBAC permission matrix remain unavailable.
+
+**Implementation boundary:** This endpoint set is sufficient for direct owner self-onboarding and business settings. Backend ownership enforcement is authoritative while the role string remains `user`; the frontend must not rewrite that value to `owner`. Staff onboarding, agent-assisted ownership transfer, multi-business access and complete RBAC remain outside this slice.
+
+**Next session target:** Implement the business schema/endpoints, protected bootstrap gate, onboarding form, business settings, shell hydration and end-to-end contract coverage, while keeping `isLive` and staff workflows unavailable pending their contracts.
+
+### Session 012 — Owner business onboarding and workspace integration
+
+**Date:** 13 November 2026  
+**Outcome:** Authenticated owner accounts now resolve, create and maintain their backend business workspace before entering operational product, sales or dashboard routes.
+
+**Completed:**
+
+- Added a Zod-validated business contract and typed RTK Query endpoints for `GET /businesses/me`, `POST /businesses` and `PATCH /businesses/:id`.
+- Enforced private initial creation in the API layer by always sending `isLive: false`; no publication control is exposed.
+- Added authenticated profile restoration for token sessions that do not yet contain the `/auth/me` user payload.
+- Added a business route gate that treats only the documented business `404` as onboarding and presents retry behavior for connectivity or server failures.
+- Added `/onboarding/business` with the required name, description, category, currency and industry fields, duplicate-creation recovery and intended-route continuation.
+- Added `/settings/business` with action-based provisional update permission and PATCH-backed identity editing.
+- Replaced the fixture shell business name with the resolved backend business and added a settings navigation entry.
+- Extended the development demo adapter with schema-valid business retrieval, creation and update behavior.
+- Added contract and component coverage for valid/malformed business responses, private onboarding fields, no-business routing, server-error isolation and demo business data.
+
+**Verification:**
+
+- ESLint passed with zero warnings.
+- TypeScript type-check passed.
+- Vitest passed 19 tests across 10 test files.
+- Production PWA build passed and generated the service worker.
+
+**Integration limitations:** Live backend execution is still required for the new endpoints. `/auth/me` continues to return `user`, so `business:update` remains a provisional permission for that generic role while backend ownership enforcement is authoritative. Staff membership and invitations are not implemented, and publication remains unavailable until `isLive` authorization is defined.
+
+**Contract risks:** Category and industry taxonomies remain free-form/document-driven. The backend's documented `403` for an invalid JWT still conflicts with permission-denied handling and should be aligned with authentication failure semantics. The client bundle now exceeds Vite's 500 kB warning threshold and should be route-split as the application grows, though the build remains successful.
+
+**Next session target:** Exercise registration, login, business-not-found resolution, creation, refresh, settings update and browser reload against the live backend; then address any observed payload or authorization differences before implementing staff onboarding.
+
+### Session 013 — Production-only API environment and demo removal
+
+**Date:** 13 November 2026  
+**Outcome:** Local and deployed frontend builds now target the current production API by default, and the development demo login has been removed.
+
+**Completed:**
+
+- Changed the default API base URL to `https://api.trada.com.ng/api/v1` while preserving `VITE_API_BASE_URL` as a future environment override.
+- Updated `apps/web/.env.example` and repository setup guidance to identify production as the current shared backend environment.
+- Removed the Vite proxy to the unavailable `http://localhost:3002` backend.
+- Removed demo credentials, login interception, the demo login card, demo-only styling, the in-memory demo API adapter and its test.
+- Added an explicit warning that local development sends real requests to production and should use test accounts and non-sensitive records.
+
+**Verification:**
+
+- ESLint passed with zero warnings.
+- TypeScript type-check passed.
+- Vitest passed 18 tests across 9 test files after removal of the demo-only test.
+- Production PWA build passed and generated the service worker.
+- No local `.env` file or repository deployment configuration overrides the new production URL.
+
+**Operational blocker:** An unauthenticated reachability probe could not resolve `api.trada.com.ng` from the execution environment, and an independent URL opener also could not access it. The frontend configuration is complete, but production DNS/TLS reachability and CORS must be confirmed from an external machine or by the backend/DevOps team before live integration testing.
+
+**Next session target:** Confirm the production hostname resolves publicly and permits the deployed frontend origin, then run the registration, login, business onboarding, settings update, refresh and browser-reload smoke test with a dedicated production test account.
+
+### Session 014 — Product design re-engineering review and implementation plan
+
+**Date:** 13 November 2026  
+**Outcome:** The new PM-chat design handoff has been audited against the cumulative PRD, current live-contract surface, implemented routes, provisional RBAC model and existing design system. A product-safe redesign plan now defines what can be retained, adapted, deferred or rejected before screen refactoring begins.
+
+**Completed:**
+
+- Reviewed the current merchant application architecture, routes, shared UI primitives, responsive shell, feature screens, tests and design-token implementation.
+- Reviewed the handoff documents and preferred authentication, merchant-dashboard and admin reference images as evidence rather than executable requirements.
+- Established a source-of-truth order: security and live contracts, confirmed PRD decisions, working behavior, approved brand assets, then PM-chat references.
+- Preserved the implemented owner journey as the redesign spine: account, business activation, inventory/catalog, sales/payment and trustworthy Owner Command Centre.
+- Classified the handoff's responsive hierarchy, owner focus and spacious layout as useful direction, while rejecting generated data, generated brand imagery, theft claims and unsupported production feature states.
+- Deferred phone/OTP, password recovery, social sign-in, AI capture, customers/debtors, storefront, subscriptions and BNPL until product decisions and backend contracts exist.
+- Separated the proposed ten-page internal admin portal into an independent product track requiring its own PRD approval, identity model, RBAC and APIs.
+- Defined the target merchant information architecture without changing deployed URLs and specified a staged implementation process covering foundations, shell, auth/onboarding, command centre, inventory, sales, settings/RBAC and release quality.
+- Recorded the detailed traceability matrix, design-system target, acceptance gates and definition of done in `PRODUCT_DESIGN_REENGINEERING_PLAN.md`.
+- Corrected the current implementation status to reflect completed business onboarding and removal of the development demo environment.
+
+**Key design decision:** The handoff's deep-navy/calm-teal screenshots do not supersede the approved Trada.com.ng navy/green migration. Until an approved vector logo and exact brand specification arrive, the redesign will retain current brand semantics and use the screenshots only for information hierarchy, density and responsive composition.
+
+**Implementation boundary:** This session changes planning documentation only. It does not add speculative routes, fake metrics, unsupported navigation or API behavior, and it does not yet refactor production screens.
+
+**Verification:**
+
+- Confirmed that every currently implemented route maps to a received API capability or an established client-side gate.
+- Confirmed that the handoff's OTP, Google sign-in, AI, customer/debtor, storefront, BNPL, subscription and platform-admin concepts lack sufficient current contract coverage.
+- Confirmed that the local handoff is untracked and broader than the public repository page accessible through the supplied VS Code URL; the complete local artifacts were used for the audit.
+
+**Next session target:** Execute Stage 0 and Stage 1: preserve a verified behavioral baseline, introduce the capability registry, normalize the token system, add shared form/feedback/page/data primitives and begin moving component-owned styling out of the monolithic application stylesheet without changing route behavior.
+
+### Session 015 — Design-system foundation and capability-aware navigation
+
+**Date:** 13 November 2026  
+**Outcome:** The first redesign implementation slice is complete. Product capability status is now explicit, shared UI foundations belong to `@trada/ui`, and merchant navigation exposes only contract-backed destinations permitted for the current role.
+
+**Completed:**
+
+- Added a typed capability registry with `available`, `contract-blocked`, `product-unapproved` and `separate-track` states plus evidence-based reasons.
+- Marked email/password authentication, business workspace, owner overview, inventory, sales and business settings as available.
+- Kept staff RBAC, customer/debtors, inventory movements, AI capture, storefront and subscriptions contract-blocked; BNPL product-unapproved; and the admin portal a separate product track.
+- Added route metadata that combines capability availability with the existing action-based RBAC helper before a destination reaches the shell.
+- Removed misleading Storefront and Reports links from merchant navigation because neither has an approved route or contract.
+- Changed the mobile quick-sale action from a dead page fragment to the real `/sales/new` route, while continuing to hide it when `sale:create` is unavailable.
+- Expanded design tokens with spacing, type, control-height, content-width, shadow, motion and focus-ring foundations without changing established navy/green brand semantics.
+- Moved Button, Badge, Surface and spinner styling out of the application stylesheet into component-owned shared UI styling.
+- Added shared `FormField`, `Input`, `Select`, `Textarea`, `Alert`, `PageHeader`, `EmptyState` and `StatCard` components.
+- Added tests for product capability guardrails, role-aware navigation, labelled form structure, semantic feedback and shared page/data patterns.
+- Updated the redesign plan to record Stage 0 and Stage 1 as complete and the navigation portion of Stage 2 as complete.
+
+**Verification:**
+
+- ESLint passed with zero warnings after correcting the navigation projection.
+- TypeScript type-check passed.
+- Vitest passed 23 tests across 11 test files.
+- Production PWA build passed and generated the service worker.
+- The initial JavaScript bundle is 510.98 kB minified (156.67 kB gzip), so the existing route-splitting warning remains.
+
+**Implementation boundary:** No API request, payload, cache rule, permission meaning or supported route URL changed. The capability registry controls presentation only; backend authorization remains authoritative.
+
+**Next session target:** Complete Stage 2 with route-level lazy loading and shell refinement, then migrate authentication and business onboarding onto the shared form, alert and page patterns as the first visible redesign vertical slice.
+
+### Session 016 — Route splitting and access/onboarding redesign
+
+**Date:** 13 November 2026  
+**Outcome:** Stage 2 is complete and the first visible Stage 3 vertical slice is implemented. Authentication and business activation now use one responsive, trust-first experience grounded only in available contracts, while every application screen loads through a dedicated route chunk.
+
+**Completed:**
+
+- Converted login, registration, business onboarding, dashboard, inventory, sales and settings screens to route-level lazy imports behind an accessible Suspense fallback.
+- Reduced the production entry JavaScript bundle from 510.98 kB to 459.46 kB minified, eliminating the previous Vite chunk-size warning.
+- Added a reusable Trada access layout for sign-in, registration and business setup with responsive navy/green composition and no generated imagery.
+- Limited access-page claims to supported product behavior: sales/payment records, stock/low-stock visibility and action on verifiable records.
+- Migrated login and registration to shared `FormField`, `Input`, `Alert` and `Button` components without changing their request payloads or navigation behavior.
+- Migrated business onboarding to shared fields, select, textarea, alert and state patterns while preserving 404-only onboarding, duplicate-business recovery, private initial creation and intended-route continuation.
+- Added explicit onboarding progress and a private-workspace disclosure without exposing storefront publication.
+- Added consistent loading and retry states for business resolution.
+- Converted shell navigation to client-side transitions, made the desktop brand return to Overview, and allowed mobile navigation columns to match the role-visible destination count.
+- Retained compatibility feedback styles for operational pages awaiting their own shared-alert migration.
+- Added tests ensuring login exposes only the supported email/password contract and contains no Google/OTP controls.
+- Added shell tests confirming unavailable destinations remain absent and supported links use client navigation.
+- Updated the redesign plan to mark Stage 2 and the current-contract Stage 3 slice complete.
+
+**Verification:**
+
+- ESLint passed with zero warnings.
+- TypeScript type-check passed.
+- Vitest passed 25 tests across 13 test files.
+- Production PWA build passed, generated the service worker and emitted individual chunks for each route.
+- The entry bundle is 459.46 kB minified (145.66 kB gzip), down from 510.98 kB (156.67 kB gzip).
+
+**Visual QA limitation:** The local workflow has no user-facing preview/browser automation tool, so responsive visual inspection at 390, 820 and 1440 px could not be claimed in this session. Responsive behavior is implemented in CSS and requires manual browser confirmation.
+
+**Implementation boundary:** No authentication provider, API payload, business contract, role meaning or publication rule changed. OTP, recovery, Google sign-in, trials, AI first action and storefront controls remain unavailable until their contracts are approved.
+
+**Next session target:** Implement Stage 4 by redesigning the Owner Command Centre around period selection, trustworthy status/attention hierarchy, qualified metrics, available next actions and honest empty/partial-data states.
+
+### Session 017 — Owner Command Centre redesign
+
+**Date:** 13 November 2026  
+**Outcome:** Stage 4 is complete for the current backend contracts. The dashboard now behaves as an owner decision surface: it leads with recorded status, stock attention and real next actions, then presents period-aware figures and activity with every financial limitation intact.
+
+**Completed:**
+
+- Added accessible Today, Last 7 days and Last 30 days selection using the existing analytics and sales `startDate`/`endDate` parameters.
+- Made the recorded-data briefing, sales metric, recent-sales query, empty copy and as-of context respond to the selected period.
+- Reordered the dashboard around business attention and available operational actions before the financial snapshot and recent activity.
+- Added direct actions for the implemented `/sales/new`, `/products/new` and `/products` workflows only; no speculative AI, customer, storefront or reporting action was introduced.
+- Reduced the low-stock preview to the most urgent three products with an explicit route to the full inventory when more require attention.
+- Kept cash received unavailable because the analytics contract does not supply it.
+- Kept gross profit qualified because backend handling of missing cost prices is undefined.
+- Kept unpaid sale balance explicitly separate from a verified customer debtor ledger.
+- Preserved independent endpoint failure, retry, loading and empty states so one failed panel does not hide valid data from the others.
+- Added component coverage for period query ranges, currently available next actions, financial distinctions and partial-data resilience.
+- Updated `PRODUCT_DESIGN_REENGINEERING_PLAN.md` to mark Stage 4 complete.
+
+**Verification:**
+
+- ESLint passed with zero warnings.
+- TypeScript type-check passed.
+- Vitest passed 27 tests across 13 test files, including four Owner Command Centre tests.
+- Production PWA build passed and generated the service worker.
+- The route-split dashboard chunk is 11.47 kB minified (3.73 kB gzip); the entry bundle remains below the warning threshold at 459.50 kB minified (145.67 kB gzip).
+
+**Visual QA limitation:** The local workflow still has no user-facing preview/browser automation tool, so responsive visual inspection at 390, 820 and 1440 px is not claimed. The responsive period selector and two-column action layout require manual browser confirmation.
+
+**Implementation boundary:** The redesign adds no time-series visualization because the current analytics endpoint returns aggregate values only. It changes no API payload meaning, cache rule, route URL or RBAC authority; backend authorization remains authoritative.
+
+**Next session target:** Begin Stage 5 by reviewing and redesigning the inventory list and product create/edit workflow around responsive records, low-stock actionability, validation, destructive-action hierarchy and permission-aware states.
+
+### Session 018 — Inventory workflow redesign
+
+**Date:** 13 November 2026  
+**Outcome:** Stage 5 is complete for the current product contracts. Inventory discovery, stock attention and product maintenance now form one responsive workflow without introducing unsupported category taxonomies, stock movements or permission assumptions.
+
+**Completed:**
+
+- Migrated the inventory heading, empty/error feedback and product form to shared page, alert, field, input, select and textarea primitives.
+- Added contract-backed product type and active-status filters alongside name, SKU and barcode search.
+- Reset pagination when search or filters change and added a single clear-filters action for recovery from empty results.
+- Added total-result and active-search context while preserving backend pagination and creation-date ordering.
+- Kept low-stock state separate from active/inactive product state so the UI does not collapse inventory health and availability into one label.
+- Added retry handling when the independent low-stock endpoint fails while keeping the main product list usable.
+- Improved responsive table-to-card presentation, product identifiers, price/offer context, stock threshold context and explicit edit links.
+- Reorganized product create/edit into product details, pricing, stock and availability sections with required-field semantics and field guidance.
+- Preserved the full product payload, SKU conflict error handling, create/update routes, backend cache invalidation and existing action-based route guards.
+- Added an active/inactive control backed by the existing `isActive` product property.
+- Replaced the browser confirmation prompt with an owner-only, in-page two-step delete confirmation and retained backend deletion as the authority.
+- Added inventory tests covering contract-backed filter parameters, separate stock/availability labels, edit routing and required form controls.
+- Updated `PRODUCT_DESIGN_REENGINEERING_PLAN.md` to mark Stage 5 complete.
+
+**Verification:**
+
+- ESLint passed with zero warnings.
+- TypeScript type-check passed.
+- Vitest passed 29 tests across 14 test files.
+- Production PWA build passed and generated the service worker.
+- The product list route chunk is 7.51 kB minified (2.57 kB gzip), and the product form route chunk is 9.70 kB minified (3.17 kB gzip).
+- The entry bundle remains below the warning threshold at 459.70 kB minified (145.78 kB gzip).
+
+**Visual QA limitation:** The local workflow still has no user-facing preview/browser automation tool, so responsive inspection of the table-to-card transition, sticky form actions and desktop form sidebar at 390, 820 and 1440 px is not claimed. Manual browser confirmation remains required.
+
+**Implementation boundary:** No category taxonomy, product image upload, stock-movement ledger, batch import or bulk update was added because those contracts do not exist. The current generic `user` role still cannot delete products; the delete control remains restricted by the provisional `product:delete` permission while backend authorization is authoritative.
+
+**Next session target:** Begin Stage 6 by redesigning sales discovery, checkout, receipt detail and cancellation around fast merchant operation while preserving the distinctions between booked revenue, amount received and outstanding balance.
+
+### Session 019 — Logo-led palette correction and sales workflow redesign
+
+**Date:** 13 November 2026  
+**Outcome:** The application palette now aligns materially with the supplied Trada logo and the PM handoff’s deep-navy/calm-teal direction. Stage 6 is also complete for current sales contracts, covering sales discovery, checkout, receipt review and guarded cancellation.
+
+**Brand review and correction:**
+
+- Reviewed `logo.jpeg` as a 1536 × 427 raster reference with a white background, deep blue-navy wordmark and calm blue-teal symbol.
+- Local color sampling identified representative logo clusters near navy `#002848` and teal `#009890`.
+- Replaced the previous saturated green masquerading as teal with logo-led navy and teal tokens.
+- Added an accessible darker teal (`#007A73`) for buttons, active controls and focus states while retaining `#009890` as the brighter brand accent.
+- Kept semantic success green, warning amber and error red separate from brand teal, as required by the PM design guidance.
+- Replaced the dashboard’s green-tinted gradient with a solid deep-navy surface and updated teal highlight washes throughout the shell.
+- Did not embed the JPEG as the production lockup because it has a white background, compression artifacts and no transparent/vector variant; the approved vector or transparent source remains required for final logo integration.
+
+**Sales workflow completed:**
+
+- Migrated sales headers, feedback, filters and checkout fields to shared accessible UI primitives.
+- Added contract-backed sale-status filtering alongside receipt/customer search, payment status and start/end dates.
+- Added result totals, clear-filters behavior and independent refresh of sales records and analytics.
+- Preserved backend pagination and reset the page when filters change.
+- Kept booked revenue distinct from money received and kept unpaid sale balance distinct from a verified customer debtor ledger.
+- Qualified gross profit because backend treatment of missing product costs is still undefined.
+- Added independent analytics failure disclosure without hiding available receipt records.
+- Improved empty, filtered-empty, loading and retry states without adding fake sales data.
+- Made unavailable inventory visible during checkout and disabled zero-stock inventory products in the selector.
+- Clarified that amount received must represent money already collected and kept booked revenue, amount received and balance due separately auditable before submit.
+- Preserved product availability checks, overpayment validation, sale payload structure, backend confirmation and post-create receipt navigation.
+- Redesigned receipt detail around shared page hierarchy, line-item audit, payment summary and optional customer notes.
+- Replaced browser confirmation with an owner-only two-step cancellation flow that clearly separates inventory restoration from customer refund confirmation.
+- Added sales tests for supported filter parameters and qualified financial meanings while retaining checkout financial-distinction coverage.
+- Updated `PRODUCT_DESIGN_REENGINEERING_PLAN.md` to mark Stage 6 complete.
+
+**Verification:**
+
+- ESLint passed with zero warnings.
+- TypeScript type-check passed.
+- Vitest passed 31 tests across 15 test files.
+- Production PWA build passed and generated the service worker.
+- Sales list is 7.95 kB minified (2.69 kB gzip), checkout is 9.00 kB (2.96 kB gzip), and receipt detail is 4.70 kB (1.86 kB gzip).
+- The entry bundle remains below the warning threshold at 459.90 kB minified (145.87 kB gzip).
+
+**Visual QA limitation:** Automated browser preview remains unavailable, so the corrected palette and responsive sales layouts still need manual inspection at 390, 820 and 1440 px. Contrast decisions were made through accessible token selection, but visual and assistive-technology confirmation is still required.
+
+**Implementation boundary:** No payment collection, refund processing, customer ledger, printable receipt, stock movement history or new role authority was introduced. Backend authorization and transaction confirmation remain authoritative.
+
+**Next session target:** Begin Stage 7 by aligning business settings and permission-denied states with the shared design system, then complete the provisional RBAC audit without implying storefront publication or undocumented staff authority.
+
+### Session 020 — Business settings and permission-state alignment
+
+**Date:** 13 November 2026  
+**Outcome:** Stage 7 is complete for the current business and authorization contracts. Business identity editing now follows the shared design system, and unavailable actions use one truthful permission state without implying storefront publication, staff administration or authority the backend has not supplied.
+
+**Completed:**
+
+- Rebuilt business settings around shared page, surface, field, input, select, textarea, alert, badge and button patterns.
+- Added explicit business-query loading, failure and retry states instead of allowing a failed request to remain indistinguishable from loading.
+- Kept the editable scope limited to the existing business name, description, category and industry contract, with Nigerian naira shown as the currently fixed working currency.
+- Presented the business as a private workspace and removed any suggestion that this screen publishes a storefront.
+- Treated `isLive` only as a backend status flag; the interface explicitly does not interpret it as proof of a public storefront.
+- Kept staff invitations and role-management controls unavailable because membership and permission contracts have not arrived.
+- Centralized protected-route loading and denied-action presentation using shared feedback patterns.
+- Made permission denials action-specific, disclosed the normalized interface role and stated that backend authorization remains authoritative.
+- Removed the misleading instruction to ask a business owner, because no supported role-management or invitation workflow currently exists.
+- Preserved the provisional action matrix for the backend's generic `user` role and all existing route guards; no frontend permission was promoted to security authority.
+- Added component tests for private business settings and permission-denied behavior while retaining the business-resolution gate coverage.
+
+**Verification:**
+
+- ESLint passed with zero warnings.
+- TypeScript type-check passed.
+- Vitest passed 33 tests across 17 test files.
+- Production PWA build passed and generated the service worker with 34 precache entries.
+- Business settings is 6.27 kB minified (2.32 kB gzip); the entry bundle remains below the warning threshold at 462.05 kB minified (146.56 kB gzip).
+
+**Test-run note:** An unstable test mock initially returned a new business object on every render and repeatedly retriggered the form synchronization effect. The fixture was made stable, scoped orphan test workers were cleared, and both focused and complete suites then passed. This was test-harness behavior, not a production defect.
+
+**Visual QA limitation:** Automated browser preview remains unavailable, so settings composition, permission states, keyboard order, focus visibility and responsive behavior at 390, 820 and 1440 px still require manual browser confirmation.
+
+**Implementation boundary:** No storefront publication, staff invitation, membership management or backend role contract was added. The current generic `user` mapping remains provisional, client guards remain presentation controls, and backend authorization is authoritative for every request.
+
+**Next session target:** Begin Stage 8 release hardening with manual responsive and keyboard review, production smoke coverage for the supported registration-to-sale journey, sensitive-data inspection and a documented release checklist. Contract-blocked domains remain outside the release scope.

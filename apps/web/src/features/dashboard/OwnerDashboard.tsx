@@ -7,12 +7,15 @@ import {
   CheckCircle2,
   CircleDollarSign,
   Clock3,
+  PackagePlus,
   ReceiptText,
   RefreshCw,
+  ShoppingCart,
   Sparkles,
   WalletCards,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { useState } from 'react';
 import { Link } from 'react-router';
 import {
   useGetLowStockProductsQuery,
@@ -20,6 +23,8 @@ import {
   useGetSalesQuery,
 } from '../../lib/api';
 import { formatNaira } from '../../lib/formatters';
+
+type DashboardPeriod = 'today' | '7days' | '30days';
 
 type Metric = {
   key: 'sales' | 'cash' | 'profit' | 'debt';
@@ -29,6 +34,12 @@ type Metric = {
   incomplete?: boolean;
 };
 
+const periodOptions: { value: DashboardPeriod; label: string }[] = [
+  { value: 'today', label: 'Today' },
+  { value: '7days', label: 'Last 7 days' },
+  { value: '30days', label: 'Last 30 days' },
+];
+
 const metricIcons: Record<Metric['key'], LucideIcon> = {
   sales: ReceiptText,
   cash: WalletCards,
@@ -37,12 +48,14 @@ const metricIcons: Record<Metric['key'], LucideIcon> = {
 };
 
 export function OwnerDashboard({ firstName = 'Tola' }: { firstName?: string }) {
-  const today = localDateKey(new Date());
-  const analytics = useGetSalesAnalyticsQuery({ startDate: today, endDate: today });
+  const [period, setPeriod] = useState<DashboardPeriod>('today');
+  const dateRange = getDateRange(period, new Date());
+  const periodLabel = periodOptions.find((option) => option.value === period)?.label ?? 'Today';
+  const periodContext = period === 'today' ? 'today' : `in the ${periodLabel.toLowerCase()}`;
+  const analytics = useGetSalesAnalyticsQuery(dateRange);
   const lowStock = useGetLowStockProductsQuery();
   const recentSales = useGetSalesQuery({
-    startDate: today,
-    endDate: today,
+    ...dateRange,
     page: 1,
     limit: 5,
     sortBy: 'createdAt',
@@ -68,7 +81,7 @@ export function OwnerDashboard({ firstName = 'Tola' }: { firstName?: string }) {
   const metrics: Metric[] = [
     {
       key: 'sales',
-      label: 'Sales today',
+      label: period === 'today' ? 'Sales today' : `Sales — ${periodLabel.toLowerCase()}`,
       value: analytics.data?.totalRevenue ?? null,
       note: analytics.data
         ? `${analytics.data.totalSalesCount} recorded ${analytics.data.totalSalesCount === 1 ? 'sale' : 'sales'}`
@@ -114,9 +127,25 @@ export function OwnerDashboard({ firstName = 'Tola' }: { firstName?: string }) {
         <div>
           <p className="eyebrow">Owner command centre</p>
           <h1>Good afternoon, {firstName}</h1>
-          <p>Here’s what has been recorded today.</p>
+          <p>See what needs your attention and what has been recorded.</p>
         </div>
-        <span className="period-button">Today</span>
+        <div className="dashboard-period" aria-label="Dashboard period">
+          {periodOptions.map((option) => (
+            <button
+              type="button"
+              key={option.value}
+              className={
+                option.value === period
+                  ? 'dashboard-period__button is-active'
+                  : 'dashboard-period__button'
+              }
+              aria-pressed={option.value === period}
+              onClick={() => setPeriod(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <Surface className="briefing" aria-labelledby="briefing-title">
@@ -125,7 +154,7 @@ export function OwnerDashboard({ firstName = 'Tola' }: { firstName?: string }) {
         </div>
         <div className="briefing__content">
           <div className="briefing__meta">
-            <h2 id="briefing-title">Today’s Sabi briefing</h2>
+            <h2 id="briefing-title">Your business briefing</h2>
             <Badge className={hasPartialError ? 'sd-badge--warning' : ''}>
               {hasPartialError ? (
                 <AlertCircle aria-hidden="true" size={14} />
@@ -135,7 +164,10 @@ export function OwnerDashboard({ firstName = 'Tola' }: { firstName?: string }) {
               {hasPartialError ? 'Partial data' : 'From recorded data'}
             </Badge>
           </div>
-          <p>{buildBriefing(saleCount, analytics.data?.totalRevenue, stockCount)}</p>
+          <p>{buildBriefing(saleCount, analytics.data?.totalRevenue, stockCount, periodContext)}</p>
+          <span className="briefing__as-of">
+            Showing {periodLabel.toLowerCase()} · updated {asOf}
+          </span>
         </div>
       </Surface>
 
@@ -151,10 +183,101 @@ export function OwnerDashboard({ firstName = 'Tola' }: { firstName?: string }) {
         </div>
       )}
 
+      <div className="dashboard-action-grid">
+        <Surface className="panel attention-panel">
+          <div className="panel__heading">
+            <div>
+              <p className="eyebrow">What needs attention</p>
+              <h2>Low-stock products</h2>
+              <p>Products at or below their restock threshold</p>
+            </div>
+            {lowStock.data && <span className="count-badge">{lowStock.data.length}</span>}
+          </div>
+          {lowStock.isLoading ? (
+            <PanelSkeleton />
+          ) : lowStock.isError || !lowStock.data ? (
+            <DashboardPanelError
+              message="Low-stock data is unavailable."
+              onRetry={() => void lowStock.refetch()}
+            />
+          ) : lowStock.data.length === 0 ? (
+            <DashboardEmpty icon={CheckCircle2} message="Stock levels look healthy right now." />
+          ) : (
+            <div className="attention-list">
+              {lowStock.data.slice(0, 3).map((product) => (
+                <article className="attention-item" key={product.id}>
+                  <span className="attention-item__icon attention-item__icon--high">
+                    <Box aria-hidden="true" size={19} />
+                  </span>
+                  <div>
+                    <h3>{product.name}</h3>
+                    <p>
+                      {product.quantity} {product.unit} left · threshold {product.stockThreshold}
+                    </p>
+                    <Link to={`/products/${product.id}`}>
+                      Review product <ArrowRight aria-hidden="true" size={15} />
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+          {lowStock.data && lowStock.data.length > 3 && (
+            <Link className="panel__footer-action" to="/products">
+              Review all low-stock products <ArrowRight aria-hidden="true" size={15} />
+            </Link>
+          )}
+        </Surface>
+
+        <Surface className="panel next-actions-panel">
+          <div className="panel__heading">
+            <div>
+              <p className="eyebrow">Next actions</p>
+              <h2>Keep the business moving</h2>
+              <p>Continue with an available workflow</p>
+            </div>
+          </div>
+          <div className="next-actions-list">
+            <Link className="next-action next-action--primary" to="/sales/new">
+              <span className="next-action__icon">
+                <ShoppingCart aria-hidden="true" size={20} />
+              </span>
+              <span>
+                <strong>Record a sale</strong>
+                <small>Create a receipt and update stock</small>
+              </span>
+              <ArrowRight aria-hidden="true" size={17} />
+            </Link>
+            <Link className="next-action" to="/products/new">
+              <span className="next-action__icon">
+                <PackagePlus aria-hidden="true" size={20} />
+              </span>
+              <span>
+                <strong>Add a product</strong>
+                <small>Set its price, quantity and threshold</small>
+              </span>
+              <ArrowRight aria-hidden="true" size={17} />
+            </Link>
+            <Link className="next-action" to="/products">
+              <span className="next-action__icon">
+                <Box aria-hidden="true" size={20} />
+              </span>
+              <span>
+                <strong>Review inventory</strong>
+                <small>Check products and stock levels</small>
+              </span>
+              <ArrowRight aria-hidden="true" size={17} />
+            </Link>
+          </div>
+        </Surface>
+      </div>
+
       <div className="section-heading">
         <div>
           <h2>Business snapshot</h2>
-          <p>Updated {asOf}</p>
+          <p>
+            {periodLabel} · updated {asOf}
+          </p>
         </div>
         <button
           className="icon-button"
@@ -198,93 +321,52 @@ export function OwnerDashboard({ firstName = 'Tola' }: { firstName?: string }) {
         })}
       </div>
 
-      <div className="dashboard__columns">
-        <Surface className="panel attention-panel">
-          <div className="panel__heading">
-            <div>
-              <h2>Low-stock attention</h2>
-              <p>Products at or below their threshold</p>
-            </div>
-            {lowStock.data && <span className="count-badge">{lowStock.data.length}</span>}
+      <Surface className="panel sales-panel">
+        <div className="panel__heading">
+          <div>
+            <h2>Recent sales</h2>
+            <p>Latest records {periodContext}</p>
           </div>
-          {lowStock.isLoading ? (
-            <PanelSkeleton />
-          ) : lowStock.isError || !lowStock.data ? (
-            <DashboardPanelError
-              message="Low-stock data is unavailable."
-              onRetry={() => void lowStock.refetch()}
-            />
-          ) : lowStock.data.length === 0 ? (
-            <DashboardEmpty icon={Box} message="No low-stock products right now." />
-          ) : (
-            <div className="attention-list">
-              {lowStock.data.slice(0, 5).map((product) => (
-                <article className="attention-item" key={product.id}>
-                  <span className="attention-item__icon attention-item__icon--high">
-                    <Box aria-hidden="true" size={19} />
-                  </span>
-                  <div>
-                    <h3>{product.name}</h3>
-                    <p>
-                      {product.quantity} {product.unit} left · threshold {product.stockThreshold}
-                    </p>
-                    <Link to={`/products/${product.id}`}>
-                      Review product <ArrowRight aria-hidden="true" size={15} />
-                    </Link>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </Surface>
-
-        <Surface className="panel products-panel">
-          <div className="panel__heading">
-            <div>
-              <h2>Recent sales</h2>
-              <p>Latest records from today</p>
-            </div>
-            <Link className="text-action" to="/sales">
-              View all
-            </Link>
+          <Link className="text-action" to="/sales">
+            View all
+          </Link>
+        </div>
+        {recentSales.isLoading ? (
+          <PanelSkeleton />
+        ) : recentSales.isError || !recentSales.data ? (
+          <DashboardPanelError
+            message="Recent sales are unavailable."
+            onRetry={() => void recentSales.refetch()}
+          />
+        ) : recentSales.data.sales.length === 0 ? (
+          <DashboardEmpty icon={ReceiptText} message={`No sales recorded ${periodContext}.`} />
+        ) : (
+          <div className="product-list">
+            {recentSales.data.sales.map((sale) => (
+              <Link
+                className="product-row dashboard-sale-row"
+                key={sale.id}
+                to={`/sales/${sale.id}`}
+              >
+                <span className="product-rank">
+                  <ReceiptText aria-hidden="true" size={15} />
+                </span>
+                <div className="product-row__main">
+                  <h3>{sale.receiptNumber}</h3>
+                  <p>
+                    {sale.customerName || 'Walk-in customer'} ·{' '}
+                    {sale.paymentStatus.replace('_', ' ')}
+                  </p>
+                </div>
+                <div className="product-row__value">
+                  <strong>{formatNaira.format(sale.totalAmount)}</strong>
+                  <span>{formatTime(sale.createdAt)}</span>
+                </div>
+              </Link>
+            ))}
           </div>
-          {recentSales.isLoading ? (
-            <PanelSkeleton />
-          ) : recentSales.isError || !recentSales.data ? (
-            <DashboardPanelError
-              message="Recent sales are unavailable."
-              onRetry={() => void recentSales.refetch()}
-            />
-          ) : recentSales.data.sales.length === 0 ? (
-            <DashboardEmpty icon={ReceiptText} message="No sales recorded today." />
-          ) : (
-            <div className="product-list">
-              {recentSales.data.sales.map((sale) => (
-                <Link
-                  className="product-row dashboard-sale-row"
-                  key={sale.id}
-                  to={`/sales/${sale.id}`}
-                >
-                  <span className="product-rank">
-                    <ReceiptText aria-hidden="true" size={15} />
-                  </span>
-                  <div className="product-row__main">
-                    <h3>{sale.receiptNumber}</h3>
-                    <p>
-                      {sale.customerName || 'Walk-in customer'} ·{' '}
-                      {sale.paymentStatus.replace('_', ' ')}
-                    </p>
-                  </div>
-                  <div className="product-row__value">
-                    <strong>{formatNaira.format(sale.totalAmount)}</strong>
-                    <span>{formatTime(sale.createdAt)}</span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </Surface>
-      </div>
+        )}
+      </Surface>
 
       <p className="dashboard__footnote">
         <Clock3 aria-hidden="true" size={14} /> Figures reflect backend records fetched at {asOf}.
@@ -333,17 +415,33 @@ function PanelSkeleton() {
   return <div className="skeleton dashboard-panel-skeleton" aria-label="Loading panel" />;
 }
 
-function buildBriefing(saleCount?: number, revenue?: number, stockCount?: number) {
+function buildBriefing(
+  saleCount: number | undefined,
+  revenue: number | undefined,
+  stockCount: number | undefined,
+  periodContext: string,
+) {
   const parts: string[] = [];
   if (saleCount !== undefined && revenue !== undefined)
     parts.push(
-      `${saleCount} ${saleCount === 1 ? 'sale' : 'sales'} worth ${formatNaira.format(revenue)} recorded today.`,
+      `${saleCount} ${saleCount === 1 ? 'sale' : 'sales'} worth ${formatNaira.format(revenue)} recorded ${periodContext}.`,
     );
-  else parts.push('Today’s sales summary is temporarily unavailable.');
+  else parts.push(`The sales summary ${periodContext} is temporarily unavailable.`);
   if (stockCount !== undefined)
-    parts.push(`${stockCount} ${stockCount === 1 ? 'product needs' : 'products need'} restocking.`);
+    parts.push(
+      stockCount === 0
+        ? 'No products currently need restocking.'
+        : `${stockCount} ${stockCount === 1 ? 'product needs' : 'products need'} restocking.`,
+    );
   else parts.push('Low-stock status is temporarily unavailable.');
   return parts.join(' ');
+}
+
+function getDateRange(period: DashboardPeriod, endDate: Date) {
+  const startDate = new Date(endDate);
+  if (period === '7days') startDate.setDate(startDate.getDate() - 6);
+  if (period === '30days') startDate.setDate(startDate.getDate() - 29);
+  return { startDate: localDateKey(startDate), endDate: localDateKey(endDate) };
 }
 
 function localDateKey(date: Date) {

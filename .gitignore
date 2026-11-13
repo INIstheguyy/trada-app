@@ -10,7 +10,9 @@ coverage
 .DS_Store
 Thumbs.db
 
-# Docs — keep off version control (except README.md)
+# Docs — keep source and progress documents off version control by default.
 *.pdf
 *.md
 !README.md
+!SabiDesk_Cumulative_Product_Requirements_Phases_1_and_2.md
+!PRODUCT_DESIGN_REENGINEERING_PLAN.md

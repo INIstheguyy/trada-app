@@ -7,7 +7,6 @@ import {
 } from '@reduxjs/toolkit/query/react';
 import { z } from 'zod';
 import { accessTokenUpdated, signedOut, type AuthState } from '../features/auth/authSlice';
-import { DEMO_ACCESS_TOKEN, runDemoRequest } from '../mocks/demoApi';
 
 const apiEnvelopeSchema = <T extends z.ZodType>(data: T) =>
   z.object({ success: z.boolean(), message: z.string().optional(), data });
@@ -68,6 +67,30 @@ export type RegisterRequest = {
 };
 export type LoginData = z.infer<typeof loginDataSchema>;
 export type ProfileData = z.infer<typeof userSchema>;
+
+const businessSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  description: z.string(),
+  category: z.string(),
+  currency: z.string(),
+  industry: z.string(),
+  isLive: z.boolean(),
+  user: z.object({ id: z.string() }),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type Business = z.infer<typeof businessSchema>;
+export type BusinessInput = Pick<
+  Business,
+  'name' | 'description' | 'category' | 'currency' | 'industry'
+>;
+export type BusinessUpdateInput = Partial<BusinessInput>;
+
+export function parseBusinessResponse(response: unknown) {
+  return apiEnvelopeSchema(businessSchema).parse(response).data;
+}
 
 const productTypeSchema = z.enum(['inventory_based', 'input_based']);
 const productConditionSchema = z.enum(['new', 'used', 'foreign_used']);
@@ -212,7 +235,7 @@ export type SaleListParams = {
 };
 
 const rawBaseQuery = fetchBaseQuery({
-  baseUrl: import.meta.env.VITE_API_BASE_URL ?? '/api/v1',
+  baseUrl: import.meta.env.VITE_API_BASE_URL ?? 'https://api.trada.com.ng/api/v1',
   prepareHeaders: (headers, { getState }) => {
     const { accessToken } = (getState() as { auth: AuthState }).auth;
     if (accessToken) headers.set('authorization', `Bearer ${accessToken}`);
@@ -226,9 +249,6 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
   apiContext,
   extraOptions,
 ) => {
-  const { accessToken } = (apiContext.getState() as { auth: AuthState }).auth;
-  if (import.meta.env.DEV && accessToken === DEMO_ACCESS_TOKEN) return runDemoRequest(args);
-
   let result = await rawBaseQuery(args, apiContext, extraOptions);
   const isRefreshRequest = typeof args !== 'string' && args.url === '/auth/refresh';
 
@@ -261,7 +281,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
-  tagTypes: ['Product', 'Sale'],
+  tagTypes: ['Business', 'Product', 'Sale'],
   endpoints: (builder) => ({
     register: builder.mutation<ProfileData, RegisterRequest>({
       query: (account) => ({ url: '/auth/register', method: 'POST', body: account }),
@@ -274,6 +294,41 @@ export const api = createApi({
     getProfile: builder.query<ProfileData, void>({
       query: () => '/auth/me',
       transformResponse: (response: unknown) => apiEnvelopeSchema(userSchema).parse(response).data,
+    }),
+    getMyBusiness: builder.query<Business, void>({
+      query: () => '/businesses/me',
+      transformResponse: parseBusinessResponse,
+      providesTags: (result) =>
+        result
+          ? [
+              { type: 'Business', id: 'CURRENT' },
+              { type: 'Business', id: result.id },
+            ]
+          : [{ type: 'Business', id: 'CURRENT' }],
+    }),
+    createBusiness: builder.mutation<Business, BusinessInput>({
+      query: (business) => ({
+        url: '/businesses',
+        method: 'POST',
+        body: { ...business, isLive: false },
+      }),
+      transformResponse: parseBusinessResponse,
+      invalidatesTags: [{ type: 'Business', id: 'CURRENT' }],
+    }),
+    updateBusiness: builder.mutation<
+      Business,
+      { id: string; changes: BusinessUpdateInput }
+    >({
+      query: ({ id, changes }) => ({
+        url: `/businesses/${id}`,
+        method: 'PATCH',
+        body: changes,
+      }),
+      transformResponse: parseBusinessResponse,
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'Business', id: 'CURRENT' },
+        { type: 'Business', id },
+      ],
     }),
     getProducts: builder.query<
       { products: Product[]; pagination: z.infer<typeof paginationSchema> },
@@ -440,7 +495,11 @@ export const api = createApi({
 export const {
   useRegisterMutation,
   useLoginMutation,
+  useGetProfileQuery,
   useLazyGetProfileQuery,
+  useGetMyBusinessQuery,
+  useCreateBusinessMutation,
+  useUpdateBusinessMutation,
   useGetProductsQuery,
   useGetLowStockProductsQuery,
   useGetProductQuery,

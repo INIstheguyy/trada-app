@@ -1,21 +1,26 @@
-import {
-  BarChart3,
-  Boxes,
-  CircleUserRound,
-  House,
-  LogOut,
-  Plus,
-  ReceiptText,
-  Store,
-} from 'lucide-react';
-import type { ReactNode } from 'react';
+import { Boxes, CircleUserRound, House, LogOut, Plus, ReceiptText, Settings } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import type { MouseEvent, ReactNode } from 'react';
 
-const navItems = [
-  { id: 'home', label: 'Home', icon: House, href: '/' },
-  { id: 'sales', label: 'Sales', icon: ReceiptText, href: '/sales' },
-  { id: 'products', label: 'Inventory', icon: Boxes, href: '/products' },
-  { id: 'storefront', label: 'Storefront', icon: Store, href: '/storefront' },
-  { id: 'reports', label: 'Reports', icon: BarChart3, href: '/reports' },
+export type AppShellNavigationItem = {
+  href: string;
+  icon: 'home' | 'sales' | 'inventory' | 'settings';
+  id: string;
+  label: string;
+};
+
+const icons: Record<AppShellNavigationItem['icon'], LucideIcon> = {
+  home: House,
+  sales: ReceiptText,
+  inventory: Boxes,
+  settings: Settings,
+};
+
+const defaultNavigation: AppShellNavigationItem[] = [
+  { id: 'home', label: 'Overview', icon: 'home', href: '/' },
+  { id: 'sales', label: 'Sales', icon: 'sales', href: '/sales' },
+  { id: 'products', label: 'Inventory', icon: 'inventory', href: '/products' },
+  { id: 'settings', label: 'Settings', icon: 'settings', href: '/settings/business' },
 ];
 
 type AppShellProps = {
@@ -23,17 +28,23 @@ type AppShellProps = {
   userName?: string;
   userRole?: string;
   businessName?: string;
+  navigation?: AppShellNavigationItem[];
+  onNavigate?: (href: string) => void;
   onSignOut?: () => void;
   activeNav?: string;
+  recordSaleHref?: string;
 };
 
 export function AppShell({
   children,
   userName = 'Trada user',
   userRole = 'user',
-  businessName = 'Oasis Gadgets',
+  businessName = 'Your business',
+  navigation = defaultNavigation,
+  onNavigate,
   onSignOut,
   activeNav = 'home',
+  recordSaleHref,
 }: AppShellProps) {
   const initials = userName
     .split(' ')
@@ -42,25 +53,40 @@ export function AppShell({
     .slice(0, 2)
     .toUpperCase();
 
+  function handleNavigate(event: MouseEvent<HTMLAnchorElement>, href: string) {
+    if (!onNavigate) return;
+    event.preventDefault();
+    onNavigate(href);
+  }
+
   return (
     <div className="sd-shell">
       <aside className="sd-sidebar" aria-label="Primary navigation">
-        <div className="sd-brand">
+        <a
+          className="sd-brand"
+          href="/"
+          aria-label="Trada overview"
+          onClick={(event) => handleNavigate(event, '/')}
+        >
           <span className="sd-brand__mark">T</span>
           <span className="sd-brand__name">Trada</span>
-        </div>
+        </a>
         <nav className="sd-nav">
-          {navItems.map(({ id, label, icon: Icon, href }) => (
-            <a
-              className={`sd-nav__item ${activeNav === id ? 'is-active' : ''}`}
-              href={href}
-              key={label}
-              aria-current={activeNav === id ? 'page' : undefined}
-            >
-              <Icon aria-hidden="true" size={21} />
-              <span>{label}</span>
-            </a>
-          ))}
+          {navigation.map(({ id, label, icon, href }) => {
+            const Icon = icons[icon];
+            return (
+              <a
+                className={`sd-nav__item ${activeNav === id ? 'is-active' : ''}`}
+                href={href}
+                key={label}
+                aria-current={activeNav === id ? 'page' : undefined}
+                onClick={(event) => handleNavigate(event, href)}
+              >
+                <Icon aria-hidden="true" size={21} />
+                <span>{label}</span>
+              </a>
+            );
+          })}
         </nav>
         <div className="sd-sidebar__profile">
           <span className="sd-avatar">{initials}</span>
@@ -77,7 +103,12 @@ export function AppShell({
       </aside>
       <div className="sd-shell__body">
         <header className="sd-topbar">
-          <a className="sd-mobile-brand" href="/" aria-label="Trada home">
+          <a
+            className="sd-mobile-brand"
+            href="/"
+            aria-label="Trada home"
+            onClick={(event) => handleNavigate(event, '/')}
+          >
             <span className="sd-brand__mark">T</span>
             <strong>Trada</strong>
           </a>
@@ -98,21 +129,36 @@ export function AppShell({
         </header>
         <main className="sd-main">{children}</main>
       </div>
-      <a className="sd-fab" href="#record-sale" aria-label="Record a sale">
-        <Plus aria-hidden="true" size={25} />
-      </a>
-      <nav className="sd-bottom-nav" aria-label="Mobile navigation">
-        {navItems.slice(0, 4).map(({ id, label, icon: Icon, href }) => (
-          <a
-            className={`sd-bottom-nav__item ${activeNav === id ? 'is-active' : ''}`}
-            href={href}
-            key={label}
-            aria-current={activeNav === id ? 'page' : undefined}
-          >
-            <Icon aria-hidden="true" size={21} />
-            <span>{label}</span>
-          </a>
-        ))}
+      {recordSaleHref && (
+        <a
+          className="sd-fab"
+          href={recordSaleHref}
+          aria-label="Record a sale"
+          onClick={(event) => handleNavigate(event, recordSaleHref)}
+        >
+          <Plus aria-hidden="true" size={25} />
+        </a>
+      )}
+      <nav
+        className="sd-bottom-nav"
+        aria-label="Mobile navigation"
+        style={{ gridTemplateColumns: `repeat(${Math.max(navigation.length, 1)}, minmax(0, 1fr))` }}
+      >
+        {navigation.slice(0, 4).map(({ id, label, icon, href }) => {
+          const Icon = icons[icon];
+          return (
+            <a
+              className={`sd-bottom-nav__item ${activeNav === id ? 'is-active' : ''}`}
+              href={href}
+              key={label}
+              aria-current={activeNav === id ? 'page' : undefined}
+              onClick={(event) => handleNavigate(event, href)}
+            >
+              <Icon aria-hidden="true" size={21} />
+              <span>{label}</span>
+            </a>
+          );
+        })}
       </nav>
     </div>
   );

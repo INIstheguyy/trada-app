@@ -1,0 +1,186 @@
+{
+  "product": "Trada",
+  "scope": "Authentication redesign onward through admin menu design",
+  "images": [
+    {
+      "file": "assets/01-auth-initial-tablet.png",
+      "original_filename": "a_polished_tablet_ui_on_a_tablet_frame_showing_a_t.png",
+      "area": "authentication",
+      "device": "tablet",
+      "reference_status": "early reference",
+      "dimensions_px": [
+        1448,
+        1086
+      ],
+      "sha256": "e369c1684c17cff1e0c68746306ecd010fa66b3f3f8d02df49f92f537da1dfc2"
+    },
+    {
+      "file": "assets/02-auth-initial-desktop.png",
+      "original_filename": "a_high_resolution_modern_responsive_website_auth.png",
+      "area": "authentication",
+      "device": "desktop",
+      "reference_status": "early reference",
+      "dimensions_px": [
+        1672,
+        941
+      ],
+      "sha256": "177fcd96a8734bed33184929ef0bc82fe3b4c2daf25ac2cd000cf2225f2badd2"
+    },
+    {
+      "file": "assets/03-auth-mobile-onboarding.png",
+      "original_filename": "a_polished_mobile_app_onboarding_authentication_sc.png",
+      "area": "authentication",
+      "device": "mobile",
+      "reference_status": "early reference",
+      "dimensions_px": [
+        1024,
+        1536
+      ],
+      "sha256": "0027efd3f5526c1aa7638f64cb19796499f8327e09dd8bd8024f81b3640b171f"
+    },
+    {
+      "file": "assets/04-auth-mobile-marketing.png",
+      "original_filename": "a_polished_mobile_app_marketing_screen_for_trada.png",
+      "area": "authentication",
+      "device": "mobile",
+      "reference_status": "intermediate reference",
+      "dimensions_px": [
+        1024,
+        1536
+      ],
+      "sha256": "e1088ee6d16f4de96f5183b96cd90d22eba3d226491a0cb5e6ff24f0150550ca"
+    },
+    {
+      "file": "assets/05-auth-mobile-final.png",
+      "original_filename": "a_polished_mobile_app_landing_authentication_scree.png",
+      "area": "authentication",
+      "device": "mobile",
+      "reference_status": "preferred",
+      "dimensions_px": [
+        1024,
+        1536
+      ],
+      "sha256": "d51e71d8eb499aba711d1c8f75b4e6e8f13e596cf8cca57c294c677cf4361643"
+    },
+    {
+      "file": "assets/06-auth-tablet-final.png",
+      "original_filename": "a_polished_tablet_ipad_like_ui_splash_authentica.png",
+      "area": "authentication",
+      "device": "tablet",
+      "reference_status": "preferred",
+      "dimensions_px": [
+        1448,
+        1086
+      ],
+      "sha256": "bef3c65710f8ff24b2179b162e33fb1b6a6ed6e2755001cdb6bd18d0589666e6"
+    },
+    {
+      "file": "assets/07-auth-desktop-final.png",
+      "original_filename": "a_polished_modern_desktop_web_landing_page_sign.png",
+      "area": "authentication",
+      "device": "desktop",
+      "reference_status": "preferred",
+      "dimensions_px": [
+        1672,
+        941
+      ],
+      "sha256": "b9b26c3bb8277b97fb327259000edac904ba182a8ec7d745fd5df4da153997bb"
+    },
+    {
+      "file": "assets/08-merchant-dashboard-mobile-initial.png",
+      "original_filename": "a_high_resolution_mobile_app_dashboard_screen_sma.png",
+      "area": "merchant-dashboard",
+      "device": "mobile",
+      "reference_status": "earlier reference",
+      "dimensions_px": [
+        1024,
+        1536
+      ],
+      "sha256": "7b5b3dc178aff0ffb560d289fc9df68d8d24862683ec2660ed81ff92984f5aec"
+    },
+    {
+      "file": "assets/09-merchant-dashboard-tablet-initial.png",
+      "original_filename": "a_clean_modern_tablet_ui_dashboard_for_trada_ai.png",
+      "area": "merchant-dashboard",
+      "device": "tablet",
+      "reference_status": "earlier reference",
+      "dimensions_px": [
+        1448,
+        1086
+      ],
+      "sha256": "b22aeca812ef65b56961d7aaeb0986006d7ff287b427783877ada4aa55093141"
+    },
+    {
+      "file": "assets/10-merchant-dashboard-desktop-initial.png",
+      "original_filename": "a_detailed_realistic_ui_dashboard_screenshot_for.png",
+      "area": "merchant-dashboard",
+      "device": "desktop",
+      "reference_status": "earlier reference",
+      "dimensions_px": [
+        1672,
+        941
+      ],
+      "sha256": "48d5eb70e60871742f64437af3fa25fca74b2060764d672f013fefe20a46916b"
+    },
+    {
+      "file": "assets/11-merchant-dashboard-mobile-minimal.png",
+      "original_filename": "a_clean_minimalist_mobile_app_dashboard_ui_verti.png",
+      "area": "merchant-dashboard",
+      "device": "mobile",
+      "reference_status": "preferred",
+      "dimensions_px": [
+        1024,
+        1536
+      ],
+      "sha256": "4d26d324b1a8c31a5a0fe681c5489a5c26bcb474dc66dd923a67645f4034fa8e"
+    },
+    {
+      "file": "assets/12-merchant-dashboard-tablet-minimal.png",
+      "original_filename": "a_clean_minimalist_tablet_dashboard_ui_landscape.png",
+      "area": "merchant-dashboard",
+      "device": "tablet",
+      "reference_status": "preferred",
+      "dimensions_px": [
+        1448,
+        1086
+      ],
+      "sha256": "01f6d1bdefacd8da65ba728edb4af042ef9f7e222ec6749a267e2b3a0c78d77f"
+    },
+    {
+      "file": "assets/13-merchant-dashboard-desktop-minimal.png",
+      "original_filename": "a_crisp_spacious_minimalist_ui_dashboard_screens.png",
+      "area": "merchant-dashboard",
+      "device": "desktop",
+      "reference_status": "preferred",
+      "dimensions_px": [
+        1672,
+        941
+      ],
+      "sha256": "1f4220495b79cb7928498d132f4ee1797b152e5ba770b03a9aa8d24966dce301"
+    },
+    {
+      "file": "assets/14-admin-overview.png",
+      "original_filename": "a_clean_modern_admin_dashboard_ui_for_trada_a.png",
+      "area": "admin",
+      "device": "desktop",
+      "reference_status": "preferred overview",
+      "dimensions_px": [
+        1536,
+        1024
+      ],
+      "sha256": "c412924f96ad15f59de6d9f43f72aa1d7efcae6786ff8d76ea4c3f3c106c10d0"
+    },
+    {
+      "file": "assets/15-admin-all-pages-board.png",
+      "original_filename": "a_large_composite_ui_design_board_for_the_trada_ad.png",
+      "area": "admin",
+      "device": "desktop",
+      "reference_status": "menu coverage reference",
+      "dimensions_px": [
+        1536,
+        1024
+      ],
+      "sha256": "f665061059730ba1d970c8b22eecc92ae7fc72027a7a56ac8e0b7f3b12dc7582"
+    }
+  ]
+}

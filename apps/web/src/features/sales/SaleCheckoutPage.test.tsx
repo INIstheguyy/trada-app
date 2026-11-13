@@ -29,7 +29,8 @@ test('keeps booked revenue, received cash and outstanding balance distinct', () 
   );
 
   expect(screen.getByText('Booked revenue')).toBeInTheDocument();
-  expect(screen.getByText('Amount received')).toBeInTheDocument();
+  expect(screen.getAllByText('Amount received')).toHaveLength(2);
   expect(screen.getByText('Balance due')).toBeInTheDocument();
+  expect(screen.getByText('Record only money already received.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Confirm and record sale' })).toBeInTheDocument();
 });

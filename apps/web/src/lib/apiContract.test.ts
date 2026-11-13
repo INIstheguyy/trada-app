@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { parseLoginResponse, parseRefreshResponse } from './api';
+import { parseBusinessResponse, parseLoginResponse, parseRefreshResponse } from './api';
 
 describe('authentication response compatibility', () => {
   test('accepts the production login token pair without an embedded user', () => {
@@ -46,5 +46,49 @@ describe('authentication response compatibility', () => {
         data: { token: 'refreshed-access-token' },
       }),
     ).toEqual({ accessToken: 'refreshed-access-token' });
+  });
+});
+describe('business response contract', () => {
+  test('accepts the documented owner business response', () => {
+    const result = parseBusinessResponse({
+      success: true,
+      message: 'Business fetched successfully',
+      data: {
+        id: '11111111-1111-4111-8111-111111111111',
+        name: 'Acme Motors',
+        description: 'Premium auto parts retailer',
+        category: 'Inventory based',
+        currency: 'NGN',
+        industry: 'Automotive',
+        isLive: false,
+        user: { id: 'user-1', email: 'private@example.com' },
+        createdAt: '2026-11-13T06:17:21.000Z',
+        updatedAt: '2026-11-13T06:17:21.000Z',
+      },
+    });
+
+    expect(result.name).toBe('Acme Motors');
+    expect(result.isLive).toBe(false);
+    expect(result.user).toEqual({ id: 'user-1' });
+  });
+
+  test('rejects a malformed business identifier', () => {
+    expect(() =>
+      parseBusinessResponse({
+        success: true,
+        data: {
+          id: 'not-a-uuid',
+          name: 'Acme Motors',
+          description: 'Premium auto parts retailer',
+          category: 'Inventory based',
+          currency: 'NGN',
+          industry: 'Automotive',
+          isLive: false,
+          user: { id: 'user-1' },
+          createdAt: '2026-11-13T06:17:21.000Z',
+          updatedAt: '2026-11-13T06:17:21.000Z',
+        },
+      }),
+    ).toThrow();
   });
 });

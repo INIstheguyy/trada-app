@@ -1,38 +1,51 @@
-import { Badge, Button, Surface } from '@trada/ui';
+import { Alert, Badge, Button, EmptyState, Input, PageHeader, Select, Surface } from '@trada/ui';
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
   Banknote,
   CircleDollarSign,
   Plus,
   ReceiptText,
+  RefreshCw,
   Search,
   TrendingUp,
 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
+import {
+  useGetSalesAnalyticsQuery,
+  useGetSalesQuery,
+  type PaymentStatus,
+  type SaleStatus,
+} from '../../lib/api';
 import { formatNaira } from '../../lib/formatters';
-import { useGetSalesAnalyticsQuery, useGetSalesQuery, type PaymentStatus } from '../../lib/api';
 
 export function SalesListPage() {
   const [draftSearch, setDraftSearch] = useState('');
   const [search, setSearch] = useState('');
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus | ''>('');
+  const [saleStatus, setSaleStatus] = useState<SaleStatus | ''>('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
   const query = {
-    search,
-    paymentStatus,
-    startDate,
-    endDate,
+    search: search || undefined,
+    paymentStatus: paymentStatus || undefined,
+    status: saleStatus || undefined,
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
     page,
     limit: 10,
     sortBy: 'createdAt' as const,
     sortOrder: 'DESC' as const,
   };
-  const { data, isLoading, isError, refetch } = useGetSalesQuery(query);
-  const { data: analytics } = useGetSalesAnalyticsQuery({ startDate, endDate });
+  const sales = useGetSalesQuery(query);
+  const analytics = useGetSalesAnalyticsQuery({
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
+  });
+  const hasFilters = Boolean(search || paymentStatus || saleStatus || startDate || endDate);
 
   function handleFilter(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -40,61 +53,84 @@ export function SalesListPage() {
     setSearch(draftSearch.trim());
   }
 
+  function clearFilters() {
+    setDraftSearch('');
+    setSearch('');
+    setPaymentStatus('');
+    setSaleStatus('');
+    setStartDate('');
+    setEndDate('');
+    setPage(1);
+  }
+
+  function refresh() {
+    void sales.refetch();
+    void analytics.refetch();
+  }
+
   return (
     <div className="sales-page">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">Sales</p>
-          <h1>Sales activity</h1>
-          <p>Track booked revenue, payments received and customer balances separately.</p>
-        </div>
-        <Button asChild>
-          <Link to="/sales/new">
-            <Plus aria-hidden="true" size={18} /> Record sale
-          </Link>
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Sales"
+        title="Sales activity"
+        description="Find receipts and audit booked revenue, money received and outstanding balances separately."
+        actions={
+          <Button asChild>
+            <Link to="/sales/new">
+              <Plus aria-hidden="true" size={18} /> Record sale
+            </Link>
+          </Button>
+        }
+      />
+
+      {analytics.isError && (
+        <Alert tone="warning" icon={<AlertCircle aria-hidden="true" size={18} />}>
+          Sales records are available, but summary figures could not be loaded.
+        </Alert>
+      )}
 
       <div className="sales-metrics">
         <Metric
           icon={ReceiptText}
-          label="Completed sales"
-          value={analytics ? String(analytics.totalSalesCount) : '—'}
-          note="For the selected period"
+          label="Recorded sales"
+          value={analytics.data ? String(analytics.data.totalSalesCount) : 'Unavailable'}
+          note="For the selected date range"
         />
         <Metric
           icon={TrendingUp}
           label="Booked revenue"
-          value={analytics ? formatNaira.format(analytics.totalRevenue) : '—'}
+          value={analytics.data ? formatNaira.format(analytics.data.totalRevenue) : 'Unavailable'}
           note="Not the same as cash received"
         />
         <Metric
           icon={CircleDollarSign}
           label="Gross profit"
-          value={analytics ? formatNaira.format(analytics.grossProfit) : '—'}
-          note="Based on recorded product costs"
+          value={analytics.data ? formatNaira.format(analytics.data.grossProfit) : 'Unavailable'}
+          note="Qualified: missing-cost treatment is undefined"
+          qualified
         />
         <Metric
           icon={Banknote}
-          label="Unpaid balance"
-          value={analytics ? formatNaira.format(analytics.unpaidBalance) : '—'}
-          note="Still owed by customers"
-          warning={Boolean(analytics?.unpaidBalance)}
+          label="Unpaid sale balance"
+          value={analytics.data ? formatNaira.format(analytics.data.unpaidBalance) : 'Unavailable'}
+          note="Not a verified customer debtor ledger"
+          qualified
+          warning={Boolean(analytics.data?.unpaidBalance)}
         />
       </div>
 
       <Surface className="sales-panel">
-        <form className="sales-filters" onSubmit={handleFilter}>
+        <form className="sales-filters" onSubmit={handleFilter} role="search">
           <label className="sales-search">
             <Search aria-hidden="true" size={17} />
-            <input
+            <Input
               aria-label="Search sales"
               placeholder="Receipt or customer"
               value={draftSearch}
               onChange={(event) => setDraftSearch(event.target.value)}
             />
           </label>
-          <select
+          <Select
             aria-label="Payment status"
             value={paymentStatus}
             onChange={(event) => {
@@ -107,10 +143,25 @@ export function SalesListPage() {
             <option value="partially_paid">Partially paid</option>
             <option value="unpaid">Unpaid</option>
             <option value="refunded">Refunded</option>
-          </select>
+          </Select>
+          <Select
+            aria-label="Sale status"
+            value={saleStatus}
+            onChange={(event) => {
+              setSaleStatus(event.target.value as SaleStatus | '');
+              setPage(1);
+            }}
+          >
+            <option value="">All sale statuses</option>
+            <option value="completed">Completed</option>
+            <option value="pending">Pending</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="refunded">Refunded</option>
+          </Select>
           <label className="date-filter">
             <span>From</span>
-            <input
+            <Input
+              aria-label="Sales from date"
               type="date"
               value={startDate}
               onChange={(event) => {
@@ -121,8 +172,10 @@ export function SalesListPage() {
           </label>
           <label className="date-filter">
             <span>To</span>
-            <input
+            <Input
+              aria-label="Sales to date"
               type="date"
+              min={startDate || undefined}
               value={endDate}
               onChange={(event) => {
                 setEndDate(event.target.value);
@@ -133,55 +186,87 @@ export function SalesListPage() {
           <button type="submit">Apply</button>
         </form>
 
-        {isLoading ? (
-          <div className="product-list-skeleton" aria-busy="true">
-            {[1, 2, 3, 4].map((item) => (
-              <div className="skeleton" key={item} />
-            ))}
+        <div className="sales-results" role="status">
+          <span>
+            {sales.data
+              ? `${sales.data.pagination.total} ${sales.data.pagination.total === 1 ? 'sale' : 'sales'} found`
+              : 'Sales records'}
+          </span>
+          <div>
+            {hasFilters && (
+              <button type="button" onClick={clearFilters}>
+                Clear filters
+              </button>
+            )}
+            <button type="button" onClick={refresh} aria-label="Refresh sales">
+              <RefreshCw
+                aria-hidden="true"
+                size={16}
+                className={sales.isFetching || analytics.isFetching ? 'sd-spin' : ''}
+              />
+            </button>
           </div>
-        ) : isError ? (
-          <div className="products-feedback" role="alert">
-            <ReceiptText aria-hidden="true" size={28} />
-            <h2>We couldn’t load sales</h2>
-            <p>Check your connection and try again.</p>
-            <Button onClick={() => refetch()}>Try again</Button>
-          </div>
-        ) : data?.sales.length === 0 ? (
-          <div className="products-feedback">
-            <ReceiptText aria-hidden="true" size={28} />
-            <h2>No sales found</h2>
-            <p>Record a sale or change the selected filters.</p>
-            <Button asChild>
-              <Link to="/sales/new">Record sale</Link>
-            </Button>
-          </div>
+        </div>
+
+        {sales.isLoading ? (
+          <SalesSkeleton />
+        ) : sales.isError ? (
+          <EmptyState
+            className="products-feedback"
+            icon={<ReceiptText aria-hidden="true" size={28} />}
+            title="We couldn’t load sales"
+            description="Check your connection and try again."
+            action={<Button onClick={() => void sales.refetch()}>Try again</Button>}
+          />
+        ) : sales.data?.sales.length === 0 ? (
+          <EmptyState
+            className="products-feedback"
+            icon={<ReceiptText aria-hidden="true" size={28} />}
+            title={hasFilters ? 'No matching sales' : 'No sales recorded yet'}
+            description={
+              hasFilters
+                ? 'Clear a filter or try another receipt or customer.'
+                : 'Record the first sale to create a receipt and update stock.'
+            }
+            action={
+              hasFilters ? (
+                <Button variant="secondary" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              ) : (
+                <Button asChild>
+                  <Link to="/sales/new">Record sale</Link>
+                </Button>
+              )
+            }
+          />
         ) : (
           <>
-            <div className="sales-table">
-              <div className="sales-table__header">
+            <div className="sales-table" role="table" aria-label="Sales records">
+              <div className="sales-table__header" role="row">
                 <span>Receipt / customer</span>
                 <span>Total</span>
-                <span>Paid</span>
+                <span>Received</span>
                 <span>Balance</span>
                 <span>Status</span>
                 <span />
               </div>
-              {data?.sales.map((sale) => (
-                <article className="sales-row" key={sale.id}>
-                  <div className="sale-primary">
+              {sales.data?.sales.map((sale) => (
+                <article className="sales-row" role="row" key={sale.id}>
+                  <div className="sale-primary" role="cell">
                     <strong>{sale.receiptNumber}</strong>
                     <small>
                       {sale.customerName || 'Walk-in customer'} · {formatDate(sale.createdAt)}
                     </small>
                   </div>
                   <SaleAmount label="Total" value={sale.totalAmount} />
-                  <SaleAmount label="Paid" value={sale.amountPaid} />
+                  <SaleAmount label="Received" value={sale.amountPaid} />
                   <SaleAmount
                     label="Balance"
                     value={sale.balanceDue}
                     warning={sale.balanceDue > 0}
                   />
-                  <div className="sale-status">
+                  <div className="sale-status" role="cell">
                     <Badge className={sale.paymentStatus === 'paid' ? '' : 'sd-badge--warning'}>
                       {formatStatus(sale.paymentStatus)}
                     </Badge>
@@ -197,26 +282,26 @@ export function SalesListPage() {
                 </article>
               ))}
             </div>
-            {data && data.pagination.totalPages > 1 && (
-              <div className="pagination">
+            {sales.data && sales.data.pagination.totalPages > 1 && (
+              <nav className="pagination" aria-label="Sales pages">
                 <button
                   type="button"
-                  disabled={!data.pagination.hasPrevPage}
+                  disabled={!sales.data.pagination.hasPrevPage}
                   onClick={() => setPage((value) => value - 1)}
                 >
                   <ArrowLeft aria-hidden="true" size={16} /> Previous
                 </button>
                 <span>
-                  Page {data.pagination.page} of {data.pagination.totalPages}
+                  Page {sales.data.pagination.page} of {sales.data.pagination.totalPages}
                 </span>
                 <button
                   type="button"
-                  disabled={!data.pagination.hasNextPage}
+                  disabled={!sales.data.pagination.hasNextPage}
                   onClick={() => setPage((value) => value + 1)}
                 >
                   Next <ArrowRight aria-hidden="true" size={16} />
                 </button>
-              </div>
+              </nav>
             )}
           </>
         )}
@@ -231,18 +316,23 @@ function Metric({
   value,
   note,
   warning = false,
+  qualified = false,
 }: {
   icon: typeof ReceiptText;
   label: string;
   value: string;
   note: string;
   warning?: boolean;
+  qualified?: boolean;
 }) {
   return (
     <Surface className="sales-metric">
-      <span className={warning ? 'sales-metric__icon is-warning' : 'sales-metric__icon'}>
-        <Icon aria-hidden="true" size={19} />
-      </span>
+      <div className="sales-metric__top">
+        <span className={warning ? 'sales-metric__icon is-warning' : 'sales-metric__icon'}>
+          <Icon aria-hidden="true" size={19} />
+        </span>
+        {qualified && <Badge className="sd-badge--warning">Qualified</Badge>}
+      </div>
       <p>{label}</p>
       <strong>{value}</strong>
       <small>{note}</small>
@@ -259,9 +349,18 @@ function SaleAmount({
   warning?: boolean;
 }) {
   return (
-    <div className={warning ? 'sale-amount is-warning' : 'sale-amount'}>
+    <div className={warning ? 'sale-amount is-warning' : 'sale-amount'} role="cell">
       <small>{label}</small>
       <strong>{formatNaira.format(value)}</strong>
+    </div>
+  );
+}
+function SalesSkeleton() {
+  return (
+    <div className="product-list-skeleton" aria-label="Loading sales" aria-busy="true">
+      {[1, 2, 3, 4].map((item) => (
+        <div className="skeleton" key={item} />
+      ))}
     </div>
   );
 }

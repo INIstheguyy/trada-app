@@ -94,6 +94,10 @@ export function parseBusinessResponse(response: unknown) {
 
 const productTypeSchema = z.enum(['inventory_based', 'input_based']);
 const productConditionSchema = z.enum(['new', 'used', 'foreign_used']);
+const decimalNumberSchema = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() !== '' ? Number(value) : value),
+  z.number().finite(),
+);
 const productSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -101,11 +105,11 @@ const productSchema = z.object({
   type: productTypeSchema,
   category: z.string().optional().nullable(),
   unit: z.string(),
-  quantity: z.number(),
-  stockThreshold: z.number(),
-  costPrice: z.number().optional().nullable(),
-  sellingPrice: z.number(),
-  discountPrice: z.number().optional().nullable(),
+  quantity: decimalNumberSchema,
+  stockThreshold: decimalNumberSchema,
+  costPrice: decimalNumberSchema.optional().nullable(),
+  sellingPrice: decimalNumberSchema,
+  discountPrice: decimalNumberSchema.optional().nullable(),
   condition: productConditionSchema.optional().default('new'),
   location: z.string().optional().nullable(),
   sku: z.string().optional().nullable(),
@@ -129,11 +133,28 @@ const paginationSchema = z.object({
 const lowStockProductSchema = z.object({
   id: z.string(),
   name: z.string(),
-  quantity: z.number(),
-  stockThreshold: z.number(),
+  quantity: decimalNumberSchema,
+  stockThreshold: decimalNumberSchema,
   unit: z.string(),
   location: z.string().optional().nullable(),
 });
+
+export function parseProductResponse(response: unknown) {
+  return apiEnvelopeSchema(productSchema).parse(response).data;
+}
+
+export function parseProductsResponse(response: unknown) {
+  const parsed = z
+    .object({
+      success: z.boolean(),
+      message: z.string().optional(),
+      data: z.array(productSchema),
+      pagination: paginationSchema,
+    })
+    .parse(response);
+
+  return { products: parsed.data, pagination: parsed.pagination };
+}
 
 export type Product = z.infer<typeof productSchema>;
 export type ProductType = z.infer<typeof productTypeSchema>;
@@ -163,12 +184,12 @@ const saleItemSchema = z.object({
   productId: z.string().optional(),
   productName: z.string(),
   sku: z.string().optional().nullable(),
-  costPrice: z.number().optional().nullable(),
-  unitPrice: z.number(),
-  quantity: z.number(),
-  subtotal: z.number().optional(),
-  discountAmount: z.number().default(0),
-  total: z.number(),
+  costPrice: decimalNumberSchema.optional().nullable(),
+  unitPrice: decimalNumberSchema,
+  quantity: decimalNumberSchema,
+  subtotal: decimalNumberSchema.optional(),
+  discountAmount: decimalNumberSchema.default(0),
+  total: decimalNumberSchema,
 });
 const saleSchema = z.object({
   id: z.string(),
@@ -176,12 +197,12 @@ const saleSchema = z.object({
   customerName: z.string().optional().nullable(),
   customerPhone: z.string().optional().nullable(),
   customerEmail: z.string().optional().nullable(),
-  subtotal: z.number(),
-  discountAmount: z.number().default(0),
-  taxAmount: z.number().default(0),
-  totalAmount: z.number(),
-  amountPaid: z.number(),
-  balanceDue: z.number(),
+  subtotal: decimalNumberSchema,
+  discountAmount: decimalNumberSchema.default(0),
+  taxAmount: decimalNumberSchema.default(0),
+  totalAmount: decimalNumberSchema,
+  amountPaid: decimalNumberSchema,
+  balanceDue: decimalNumberSchema,
   paymentMethod: paymentMethodSchema,
   paymentStatus: paymentStatusSchema,
   status: saleStatusSchema,
@@ -191,14 +212,31 @@ const saleSchema = z.object({
   updatedAt: z.string().optional(),
 });
 const saleAnalyticsSchema = z.object({
-  totalSalesCount: z.number(),
-  totalRevenue: z.number(),
-  totalCost: z.number(),
-  grossProfit: z.number(),
-  totalDiscount: z.number(),
-  totalTax: z.number(),
-  unpaidBalance: z.number(),
+  totalSalesCount: decimalNumberSchema,
+  totalRevenue: decimalNumberSchema,
+  totalCost: decimalNumberSchema,
+  grossProfit: decimalNumberSchema,
+  totalDiscount: decimalNumberSchema,
+  totalTax: decimalNumberSchema,
+  unpaidBalance: decimalNumberSchema,
 });
+
+export function parseSaleResponse(response: unknown) {
+  return apiEnvelopeSchema(saleSchema).parse(response).data;
+}
+
+export function parseSalesResponse(response: unknown) {
+  const parsed = z
+    .object({
+      success: z.boolean(),
+      message: z.string().optional(),
+      data: z.array(saleSchema),
+      pagination: paginationSchema,
+    })
+    .parse(response);
+
+  return { sales: parsed.data, pagination: parsed.pagination };
+}
 
 export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
 export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
@@ -315,10 +353,7 @@ export const api = createApi({
       transformResponse: parseBusinessResponse,
       invalidatesTags: [{ type: 'Business', id: 'CURRENT' }],
     }),
-    updateBusiness: builder.mutation<
-      Business,
-      { id: string; changes: BusinessUpdateInput }
-    >({
+    updateBusiness: builder.mutation<Business, { id: string; changes: BusinessUpdateInput }>({
       query: ({ id, changes }) => ({
         url: `/businesses/${id}`,
         method: 'PATCH',
@@ -340,17 +375,7 @@ export const api = createApi({
           ? Object.fromEntries(Object.entries(params).filter(([, value]) => value !== ''))
           : undefined,
       }),
-      transformResponse: (response: unknown) => {
-        const parsed = z
-          .object({
-            success: z.boolean(),
-            message: z.string().optional(),
-            data: z.array(productSchema),
-            pagination: paginationSchema,
-          })
-          .parse(response);
-        return { products: parsed.data, pagination: parsed.pagination };
-      },
+      transformResponse: parseProductsResponse,
       providesTags: (result) =>
         result
           ? [
@@ -367,14 +392,12 @@ export const api = createApi({
     }),
     getProduct: builder.query<Product, string>({
       query: (id) => `/products/${id}`,
-      transformResponse: (response: unknown) =>
-        apiEnvelopeSchema(productSchema).parse(response).data,
+      transformResponse: parseProductResponse,
       providesTags: (_result, _error, id) => [{ type: 'Product', id }],
     }),
     createProduct: builder.mutation<Product, ProductInput>({
       query: (product) => ({ url: '/products', method: 'POST', body: product }),
-      transformResponse: (response: unknown) =>
-        apiEnvelopeSchema(productSchema).parse(response).data,
+      transformResponse: parseProductResponse,
       invalidatesTags: [
         { type: 'Product', id: 'LIST' },
         { type: 'Product', id: 'LOW_STOCK' },
@@ -423,17 +446,7 @@ export const api = createApi({
           ? Object.fromEntries(Object.entries(params).filter(([, value]) => value !== ''))
           : undefined,
       }),
-      transformResponse: (response: unknown) => {
-        const parsed = z
-          .object({
-            success: z.boolean(),
-            message: z.string().optional(),
-            data: z.array(saleSchema),
-            pagination: paginationSchema,
-          })
-          .parse(response);
-        return { sales: parsed.data, pagination: parsed.pagination };
-      },
+      transformResponse: parseSalesResponse,
       providesTags: (result) =>
         result
           ? [
@@ -444,12 +457,12 @@ export const api = createApi({
     }),
     getSale: builder.query<Sale, string>({
       query: (id) => `/sales/${id}`,
-      transformResponse: (response: unknown) => apiEnvelopeSchema(saleSchema).parse(response).data,
+      transformResponse: parseSaleResponse,
       providesTags: (_result, _error, id) => [{ type: 'Sale', id }],
     }),
     createSale: builder.mutation<Sale, CreateSaleInput>({
       query: (sale) => ({ url: '/sales', method: 'POST', body: sale }),
-      transformResponse: (response: unknown) => apiEnvelopeSchema(saleSchema).parse(response).data,
+      transformResponse: parseSaleResponse,
       invalidatesTags: [
         { type: 'Sale', id: 'LIST' },
         { type: 'Sale', id: 'ANALYTICS' },

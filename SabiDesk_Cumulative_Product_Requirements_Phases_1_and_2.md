@@ -1467,3 +1467,82 @@ These items require clarification before the frontend treats the backend as the 
 **Implementation boundary:** No storefront publication, staff invitation, membership management or backend role contract was added. The current generic `user` mapping remains provisional, client guards remain presentation controls, and backend authorization is authoritative for every request.
 
 **Next session target:** Begin Stage 8 release hardening with manual responsive and keyboard review, production smoke coverage for the supported registration-to-sale journey, sensitive-data inspection and a documented release checklist. Contract-blocked domains remain outside the release scope.
+
+### Session 021 — Production product-response compatibility fix
+
+**Date:** 13 November 2026  
+**Outcome:** The production-only product creation error and empty inventory list were traced to response validation rather than failed requests. Product decimal values are now normalized consistently whether the API returns JSON numbers or database-decimal strings.
+
+**Issue confirmed:**
+
+- `POST /products` successfully created the record but returned a mixed representation: fields such as `quantity` and `costPrice` were strings while `stockThreshold` and `sellingPrice` were numbers.
+- `GET /products` returned product quantities, thresholds and prices as decimal strings.
+- The frontend product schema previously required numbers only, so Zod rejected the successful mutation response and RTK Query surfaced a UI error. The same validation failure rejected the complete list response before any item could render.
+- The browser's `304 Not Modified` entry represented HTTP cache revalidation and was not the cause of the missing UI records.
+
+**Completed:**
+
+- Added a shared product-decimal response schema that accepts finite JSON numbers and non-empty numeric strings, then normalizes both to numbers for application use.
+- Applied normalization to quantity, stock threshold, cost price, selling price and optional discount price.
+- Applied the same normalization to low-stock quantities and thresholds.
+- Centralized single-product and paginated-product parsing so create, detail and list endpoints use the same compatibility behavior.
+- Preserved numeric request payloads; this change affects response compatibility only.
+- Added regression coverage using the exact mixed create-response and string-decimal list-response patterns observed in production.
+
+**Security follow-up required from backend:**
+
+- The production product-list response embeds `createdBy.password`, containing the user's password hash. The frontend Zod schema strips unknown nested objects before application use, but this does not remove the exposure from the network response.
+- The backend must exclude `password` and all other authentication secrets from every user serialization and nested relation. A shared safe-user serializer or explicit ORM field selection should be used, followed by an audit of all endpoints that include user records.
+- Existing password hashes should be treated as disclosed to authenticated product-list consumers. The backend/security owner must assess credential reset or hash-rotation requirements according to the production incident policy.
+
+**Verification:**
+
+- ESLint passed with zero warnings.
+- TypeScript type-check passed.
+- Focused product contract, form and list coverage passed 10 tests across 3 test files.
+- The complete suite passed 35 tests across 17 test files.
+- Production PWA build passed and generated the service worker with 34 precache entries.
+- The entry bundle remains below the warning threshold at 462.29 kB minified (146.70 kB gzip).
+
+**Implementation boundary:** No backend record, request payload, inventory rule or cache policy changed. The fix tolerates the production API's documented decimal serialization while continuing to reject empty and non-numeric values.
+
+**Next session target:** Verify product create → inventory list → edit against the deployed frontend after release, and prioritize backend removal of the nested password hash before broader production smoke testing.
+
+### Session 022 — Production sales-response compatibility fix
+
+**Date:** 13 November 2026  
+**Outcome:** The production sale-recording UI error was confirmed as the sales equivalent of the product decimal mismatch. Successful sale responses, sales lists, receipt details, cancellations and analytics can now consume finite decimal strings without losing numeric behavior in the interface.
+
+**Issue confirmed:**
+
+- `POST /sales` returned `201 Created` and persisted the sale, but serialized sale totals, payment amounts, balances and line-item values as decimal strings.
+- The frontend sales schema required numbers, so Zod rejected the successful response and RTK Query surfaced an error before checkout could navigate to the receipt.
+- The same serialization pattern could prevent sales-list, receipt-detail and aggregate analytics responses from rendering.
+
+**Completed:**
+
+- Reused the finite decimal normalizer introduced for production product responses.
+- Normalized sale subtotal, discount, tax, total, amount paid and balance due values.
+- Normalized line-item cost price, unit price, quantity, subtotal, discount and total values.
+- Applied compatible numeric normalization to sales analytics, including backend aggregate values that may be serialized as strings.
+- Centralized single-sale and paginated-sales parsing so create, detail and list endpoints share the same response behavior.
+- Preserved numeric checkout request payloads and all existing financial distinctions; this is response compatibility only.
+- Added regression tests based on the observed production sale and line-item response.
+
+**Security follow-up remains urgent:**
+
+- The sale response also embeds `createdBy.password`. Frontend parsing discards the extra nested object, but the hash is still disclosed in the network response.
+- Backend safe-user serialization and an endpoint-wide nested-user audit remain required; the frontend cannot remediate a secret already transmitted by the server.
+
+**Verification:**
+
+- ESLint passed with zero warnings.
+- TypeScript type-check passed.
+- Focused contract, checkout and sales-list coverage passed 12 tests across 3 test files.
+- The complete suite passed 37 tests across 17 test files.
+- Production PWA build passed and generated the service worker with 34 precache entries.
+- The entry bundle remains below the warning threshold at 462.27 kB minified (146.70 kB gzip).
+
+**Implementation boundary:** No sale calculation, payment rule, stock deduction, request payload, cache policy or backend record was changed. Empty and non-numeric response values continue to fail validation rather than being silently converted.
+
+**Next session target:** Deploy the compatibility fixes, verify product creation and sale recording end to end against production, and block broader release sign-off until the backend removes password hashes from nested user responses.

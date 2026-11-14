@@ -1546,3 +1546,45 @@ These items require clarification before the frontend treats the backend as the 
 **Implementation boundary:** No sale calculation, payment rule, stock deduction, request payload, cache policy or backend record was changed. Empty and non-numeric response values continue to fail validation rather than being silently converted.
 
 **Next session target:** Deploy the compatibility fixes, verify product creation and sale recording end to end against production, and block broader release sign-off until the backend removes password hashes from nested user responses.
+
+### Session 023 — Explicit account menu and product-logo integration
+
+**Date:** 14 November 2026  
+**Outcome:** The misleading mobile profile interaction is corrected and the supplied Trada logo is integrated into the working application. Opening the account control no longer signs the user out; logout now requires an explicit labelled action.
+
+**Issue confirmed:**
+
+- The mobile top-bar profile icon was directly wired to the local sign-out handler. A control that visually communicated “profile” therefore cleared the session immediately and redirected to `/login`.
+- Logout functionality existed, but only as frontend session cleanup: it clears authentication state, removes the stored browser session, resets RTK Query data and navigates to login.
+- No backend logout or refresh-token revocation endpoint is present in the current API documentation, so the frontend cannot revoke a refresh token server-side.
+- The supplied `logo.jpeg` had informed the palette but had not been rendered in the product; temporary letter `T` marks remained visible.
+
+**Completed:**
+
+- Replaced the mobile profile-as-logout control with an accessible account-menu trigger using `aria-expanded` and `aria-haspopup` semantics.
+- Added an account menu that displays the current user name and normalized interface role.
+- Added a separate, clearly labelled **Sign out** menu action; opening the menu alone does not alter authentication state or navigation.
+- Preserved the existing desktop sign-out control and the full local cleanup sequence.
+- Integrated the supplied logo asset into desktop navigation, mobile navigation, access screens and the route-loading state.
+- Added responsive logo sizing and neutral white mounting surfaces because the supplied JPEG has an opaque white background.
+- Added shell regression coverage proving that the account control opens first and logout occurs only after the explicit menu action.
+
+**Authentication boundary:**
+
+- Current sign-out removes the local session and cached business data, which is the strongest supported behavior with the available contract.
+- Backend work is still required for refresh-token rotation/revocation and a documented logout endpoint. Once available, the frontend should call it before clearing local state, with local cleanup retained as a fallback.
+
+**Verification:**
+
+- ESLint passed with zero warnings.
+- TypeScript type-check passed.
+- Focused shell and authentication coverage passed 5 tests across 3 test files.
+- The complete suite passed 38 tests across 17 test files.
+- Production PWA build passed and generated the service worker with 34 precache entries.
+- The entry bundle remains below the warning threshold at 462.77 kB minified (146.81 kB gzip).
+
+**Visual QA limitation:** Automated browser preview remains unavailable. The logo sizing, white raster mounting surface and account-menu positioning still require manual inspection at 390, 820 and 1440 px.
+
+**Asset limitation:** The supplied JPEG is now used, but a transparent SVG or high-resolution transparent PNG remains preferable for final production branding, particularly on the navy sidebar.
+
+**Next session target:** Manually verify the account menu and logo at supported breakpoints, obtain a transparent/vector logo source, and integrate backend refresh-token revocation when the logout contract is delivered.

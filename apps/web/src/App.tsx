@@ -143,7 +143,7 @@ export function App() {
 function RouteLoading() {
   return (
     <div className="route-loading" role="status" aria-live="polite">
-      <span className="route-loading__mark">T</span>
+      <img className="route-loading__logo" src="/trada-logo.jpeg" alt="" />
       <span>Loading your workspace…</span>
     </div>
   );

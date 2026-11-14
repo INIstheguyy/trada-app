@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { AppShell } from '@trada/ui';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { expect, test, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, expect, test, vi } from 'vitest';
 import { getMerchantNavigation } from './navigation';
+
+afterEach(cleanup);
 
 test('uses client navigation and hides unavailable merchant destinations', () => {
   const onNavigate = vi.fn();
@@ -23,4 +25,20 @@ test('uses client navigation and hides unavailable merchant destinations', () =>
   expect(onNavigate).toHaveBeenCalledWith('/sales');
   fireEvent.click(screen.getByRole('link', { name: 'Record a sale' }));
   expect(onNavigate).toHaveBeenCalledWith('/sales/new');
+});
+
+test('opens an account menu before signing out', () => {
+  const onSignOut = vi.fn();
+  render(
+    <AppShell userName="Ada Okon" userRole="owner" onSignOut={onSignOut}>
+      <p>Workspace</p>
+    </AppShell>,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Open account menu' }));
+  expect(onSignOut).not.toHaveBeenCalled();
+  expect(screen.getByRole('menu')).toHaveTextContent('Ada Okon');
+
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
+  expect(onSignOut).toHaveBeenCalledOnce();
 });

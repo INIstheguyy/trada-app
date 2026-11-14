@@ -27,9 +27,8 @@ export function AuthLayout({
     <main className="access-layout">
       <aside className="access-story" aria-label="About Trada">
         <Link className="access-brand" to="/" aria-label="Trada home">
-          <span className="sd-brand__mark">T</span>
+          <img src="/trada-logo.jpeg" alt="" />
           <span>
-            <strong>Trada</strong>
             <small>Manage · Sell · Grow</small>
           </span>
         </Link>

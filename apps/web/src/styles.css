@@ -9,17 +9,13 @@
   font-size: 14px;
   font-weight: 700;
 }
-.route-loading__mark {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px 14px 14px 5px;
-  display: grid;
-  place-items: center;
-  color: white;
-  background: var(--sd-action-primary);
+.route-loading__logo {
+  width: 138px;
+  height: auto;
+  padding: 6px 9px;
+  border-radius: 10px;
+  background: white;
   box-shadow: var(--sd-shadow-sm);
-  font-size: 20px;
-  font-weight: 850;
 }
 
 /* Shell */
@@ -52,15 +48,15 @@
   align-items: center;
   gap: 10px;
 }
-.sd-brand__mark {
-  width: 34px;
-  height: 34px;
-  color: white;
-  background: var(--sd-teal-700);
-  border-radius: 10px 10px 10px 3px;
-  display: grid;
-  place-items: center;
-  font-weight: 800;
+.sd-brand__logo,
+.sd-mobile-brand__logo {
+  width: 100px;
+  height: auto;
+  padding: 4px 7px;
+  border-radius: 7px;
+  background: white;
+  display: block;
+  object-fit: contain;
 }
 .sd-business {
   display: flex;
@@ -84,7 +80,10 @@
 .sd-business strong {
   font-size: 13px;
 }
-.sd-mobile-signout {
+.sd-account {
+  position: relative;
+}
+.sd-account__trigger {
   width: 42px;
   height: 42px;
   padding: 0;
@@ -95,6 +94,67 @@
   display: grid;
   place-items: center;
   cursor: pointer;
+}
+.sd-account__trigger:hover,
+.sd-account__trigger[aria-expanded='true'] {
+  color: var(--sd-teal-700);
+  background: var(--sd-teal-100);
+}
+.sd-account__menu {
+  width: min(260px, calc(100vw - 32px));
+  padding: 8px;
+  border: 1px solid var(--sd-border);
+  border-radius: 12px;
+  background: white;
+  box-shadow: var(--sd-shadow-sm);
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+}
+.sd-account__identity {
+  padding: 9px 10px 12px;
+  border-bottom: 1px solid var(--sd-border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sd-account__identity > span:last-child,
+.sd-account__identity strong,
+.sd-account__identity small {
+  min-width: 0;
+  display: block;
+}
+.sd-account__identity strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sd-account__identity small {
+  margin-top: 2px;
+  color: var(--sd-text-muted);
+  font-size: 11px;
+}
+.sd-account__menu > button {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 6px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--sd-red-700);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+.sd-account__menu > button:hover {
+  background: var(--sd-red-100);
 }
 .sd-main {
   width: min(100%, 1440px);
@@ -826,6 +886,14 @@
   display: flex;
   align-items: center;
   gap: 11px;
+}
+.access-brand > img {
+  width: 145px;
+  height: auto;
+  padding: 6px 9px;
+  border-radius: 9px;
+  background: white;
+  display: block;
 }
 .access-brand > span:last-child {
   display: grid;
@@ -2181,6 +2249,10 @@
   .sd-brand {
     justify-content: center;
   }
+  .sd-brand__logo {
+    width: 58px;
+    padding: 4px;
+  }
   .sd-brand__name,
   .sd-profile-copy,
   .sd-nav__item span {
@@ -2323,6 +2395,10 @@
     color: white;
     font-size: 19px;
     font-weight: 800;
+  }
+  .sd-brand__logo {
+    width: 128px;
+    padding: 5px 8px;
   }
   .sd-brand__name,
   .sd-profile-copy,

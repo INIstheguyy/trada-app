@@ -1,6 +1,6 @@
 import { Boxes, CircleUserRound, House, LogOut, Plus, ReceiptText, Settings } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { MouseEvent, ReactNode } from 'react';
+import { useState, type MouseEvent, type ReactNode } from 'react';
 
 export type AppShellNavigationItem = {
   href: string;
@@ -46,6 +46,7 @@ export function AppShell({
   activeNav = 'home',
   recordSaleHref,
 }: AppShellProps) {
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const initials = userName
     .split(' ')
     .map((part) => part[0])
@@ -68,8 +69,7 @@ export function AppShell({
           aria-label="Trada overview"
           onClick={(event) => handleNavigate(event, '/')}
         >
-          <span className="sd-brand__mark">T</span>
-          <span className="sd-brand__name">Trada</span>
+          <img className="sd-brand__logo" src="/trada-logo.jpeg" alt="" />
         </a>
         <nav className="sd-nav">
           {navigation.map(({ id, label, icon, href }) => {
@@ -109,22 +109,49 @@ export function AppShell({
             aria-label="Trada home"
             onClick={(event) => handleNavigate(event, '/')}
           >
-            <span className="sd-brand__mark">T</span>
-            <strong>Trada</strong>
+            <img className="sd-mobile-brand__logo" src="/trada-logo.jpeg" alt="" />
           </a>
           <div className="sd-business">
             <span>
               <small>Viewing business</small>
               <strong>{businessName}</strong>
             </span>
-            <button
-              className="sd-mobile-signout"
-              type="button"
-              onClick={onSignOut}
-              aria-label="Sign out"
-            >
-              <CircleUserRound aria-hidden="true" size={28} />
-            </button>
+            <div className="sd-account">
+              <button
+                className="sd-account__trigger"
+                type="button"
+                onClick={() => setAccountMenuOpen((open) => !open)}
+                aria-label="Open account menu"
+                aria-expanded={accountMenuOpen}
+                aria-haspopup="menu"
+              >
+                <CircleUserRound aria-hidden="true" size={28} />
+              </button>
+              {accountMenuOpen && (
+                <div className="sd-account__menu" role="menu">
+                  <div className="sd-account__identity">
+                    <span className="sd-avatar">{initials}</span>
+                    <span>
+                      <strong>{userName}</strong>
+                      <small>{formatRole(userRole)}</small>
+                    </span>
+                  </div>
+                  {onSignOut && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        onSignOut();
+                      }}
+                    >
+                      <LogOut aria-hidden="true" size={17} />
+                      Sign out
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </header>
         <main className="sd-main">{children}</main>

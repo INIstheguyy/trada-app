@@ -1,17 +1,36 @@
 import { Alert, Button, FormField, Input, PageHeader, Select, Surface, Textarea } from '@trada/ui';
-import { ArrowLeft, Minus, Plus, ReceiptText, ShoppingCart, Trash2 } from 'lucide-react';
-import { useMemo, useState, type FormEvent } from 'react';
+import {
+  ArrowLeft,
+  FilePenLine,
+  Mic,
+  Minus,
+  Plus,
+  ReceiptText,
+  ShoppingCart,
+  Square,
+  Trash2,
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { formatNaira } from '../../lib/formatters';
 import { readApiError } from '../../lib/apiError';
 import {
   useCreateSaleMutation,
+  useCreateVoiceSaleDraftMutation,
   useGetProductsQuery,
   type PaymentMethod,
   type Product,
+  type VoiceSaleDraft,
+  type VoiceSaleDraftRequest,
 } from '../../lib/api';
 
 type CartItem = { product: Product; quantity: number; unitPrice: number; discountAmount: number };
+type VoiceRecordingPreview = {
+  blob: Blob;
+  durationSeconds: number;
+  mimeType: string;
+  url: string;
+};
 
 export function SaleCheckoutPage() {
   const navigate = useNavigate();
@@ -28,6 +47,7 @@ export function SaleCheckoutPage() {
     sortOrder: 'ASC',
   });
   const [createSale, { isLoading }] = useCreateSaleMutation();
+  const [createVoiceSaleDraft, voiceDraftState] = useCreateVoiceSaleDraftMutation();
   const [selectedProductId, setSelectedProductId] = useState('');
   const [items, setItems] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState('');
@@ -39,6 +59,39 @@ export function SaleCheckoutPage() {
   const [taxAmount, setTaxAmount] = useState(0);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string>();
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [voiceDraft, setVoiceDraft] = useState<VoiceSaleDraft>();
+  const [voiceError, setVoiceError] = useState<string>();
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [recordingElapsedSeconds, setRecordingElapsedSeconds] = useState(0);
+  const [audioPreview, setAudioPreview] = useState<VoiceRecordingPreview>();
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const recordedAudioChunksRef = useRef<Blob[]>([]);
+  const recordingStartedAtRef = useRef<number | null>(null);
+  const audioPreviewUrlRef = useRef<string | null>(null);
+
+  useEffect(
+    () => () => {
+      mediaRecorderRef.current?.stop();
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      if (audioPreviewUrlRef.current) URL.revokeObjectURL(audioPreviewUrlRef.current);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!isRecordingVoice) return;
+    const timer = window.setInterval(() => {
+      setRecordingElapsedSeconds(
+        Math.max(
+          0,
+          Math.floor((Date.now() - (recordingStartedAtRef.current ?? Date.now())) / 1000),
+        ),
+      );
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [isRecordingVoice]);
 
   const subtotal = useMemo(
     () =>
@@ -50,6 +103,21 @@ export function SaleCheckoutPage() {
   );
   const totalAmount = Math.max(0, subtotal - discountAmount + taxAmount);
   const balanceDue = Math.max(0, totalAmount - amountPaid);
+  const draftItems = voiceDraft?.sale?.items ?? voiceDraft?.extractedFields?.items ?? [];
+  const draftItemsMissingCheckoutData = draftItems.filter(
+    (item) =>
+      !item.productId ||
+      item.quantity == null ||
+      item.quantity <= 0 ||
+      item.unitPrice == null ||
+      item.unitPrice < 0 ||
+      !productsData?.products.some((product) => product.id === item.productId),
+  );
+  const canApplyVoiceDraft =
+    Boolean(voiceDraft) &&
+    items.length === 0 &&
+    draftItems.length > 0 &&
+    draftItemsMissingCheckoutData.length === 0;
 
   function addProduct() {
     const product = productsData?.products.find((candidate) => candidate.id === selectedProductId);
@@ -77,6 +145,141 @@ export function SaleCheckoutPage() {
     setItems((current) =>
       current.map((item) => (item.product.id === id ? { ...item, ...changes } : item)),
     );
+  }
+
+  async function generateVoiceDraft(input: VoiceSaleDraftRequest) {
+    setVoiceError(undefined);
+    setVoiceDraft(undefined);
+    try {
+      const draft = await createVoiceSaleDraft(input).unwrap();
+      setVoiceDraft(draft);
+    } catch (reason) {
+      setVoiceError(
+        readApiError(
+          reason,
+          'We couldn’t prepare a sale draft. You can continue with manual checkout.',
+        ),
+      );
+    }
+  }
+
+  async function startVoiceRecording() {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setVoiceError(
+        'Voice recording is not supported in this browser. Type the sale description instead.',
+      );
+      return;
+    }
+
+    setVoiceError(undefined);
+    setVoiceDraft(undefined);
+    discardAudioPreview();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const preferredMimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : 'audio/webm';
+      const recorder = new MediaRecorder(stream, { mimeType: preferredMimeType });
+      recordedAudioChunksRef.current = [];
+      recordingStartedAtRef.current = Date.now();
+      setRecordingElapsedSeconds(0);
+      mediaStreamRef.current = stream;
+      mediaRecorderRef.current = recorder;
+
+      recorder.addEventListener('dataavailable', (event) => {
+        if (event.data.size > 0) recordedAudioChunksRef.current.push(event.data);
+      });
+      recorder.addEventListener('stop', () => {
+        const mimeType = recorder.mimeType || preferredMimeType;
+        const recording = new Blob(recordedAudioChunksRef.current, { type: mimeType });
+        mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+        mediaRecorderRef.current = null;
+        setIsRecordingVoice(false);
+        const durationSeconds = Math.max(
+          1,
+          Math.round((Date.now() - (recordingStartedAtRef.current ?? Date.now())) / 1000),
+        );
+        setRecordingElapsedSeconds(durationSeconds);
+        if (recording.size === 0) {
+          setVoiceError(
+            'No audio was captured. Try recording again or type the sale description instead.',
+          );
+          return;
+        }
+        const url = URL.createObjectURL(recording);
+        audioPreviewUrlRef.current = url;
+        setAudioPreview({
+          blob: recording,
+          durationSeconds,
+          mimeType: recording.type || 'audio/webm',
+          url,
+        });
+      });
+      recorder.start();
+      setIsRecordingVoice(true);
+    } catch {
+      setVoiceError(
+        'We could not access your microphone. Allow microphone access or type the sale description instead.',
+      );
+    }
+  }
+
+  function stopVoiceRecording() {
+    if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
+  }
+
+  function discardAudioPreview() {
+    if (audioPreviewUrlRef.current) URL.revokeObjectURL(audioPreviewUrlRef.current);
+    audioPreviewUrlRef.current = null;
+    setAudioPreview(undefined);
+  }
+
+  function prepareAudioVoiceDraft() {
+    if (!audioPreview) return;
+    void recordingToDataUrl(audioPreview.blob).then((audio) =>
+      generateVoiceDraft({ audio, mimeType: audioPreview.mimeType }),
+    );
+  }
+
+  function prepareTypedVoiceDraft() {
+    const text = voiceTranscript.trim();
+    if (!text) {
+      setVoiceError('Enter a sale description to prepare a typed draft.');
+      return;
+    }
+    void generateVoiceDraft({ text });
+  }
+
+  function applyVoiceDraft() {
+    if (!voiceDraft || !productsData || !canApplyVoiceDraft) return;
+
+    const sale = voiceDraft.sale;
+    const extracted = voiceDraft.extractedFields;
+    const draftedItems: CartItem[] = draftItems.flatMap((item) => {
+      const product = productsData.products.find((candidate) => candidate.id === item.productId);
+      if (!product || item.quantity == null || item.unitPrice == null) return [];
+      return [
+        {
+          product,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          discountAmount: item.discountAmount ?? 0,
+        },
+      ];
+    });
+
+    setItems(draftedItems);
+    setCustomerName(sale?.customerName ?? extracted?.customerName ?? '');
+    setCustomerPhone(sale?.customerPhone ?? extracted?.customerPhone ?? '');
+    setCustomerEmail(sale?.customerEmail ?? extracted?.customerEmail ?? '');
+    setPaymentMethod(sale?.paymentMethod ?? extracted?.paymentMethod ?? 'cash');
+    setAmountPaid(sale?.amountPaid ?? extracted?.amountPaid ?? 0);
+    setDiscountAmount(sale?.discountAmount ?? extracted?.discountAmount ?? 0);
+    setTaxAmount(sale?.taxAmount ?? extracted?.taxAmount ?? 0);
+    setNotes(sale?.notes ?? '');
+    setVoiceDraft(undefined);
+    setVoiceError(undefined);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -138,6 +341,146 @@ export function SaleCheckoutPage() {
       <form className="checkout-layout" onSubmit={handleSubmit}>
         <div className="checkout-main">
           {error && <Alert tone="error">{error}</Alert>}
+          <Surface className="checkout-section voice-draft-entry">
+            <div className="form-section-heading">
+              <h2>Record sale by voice</h2>
+              <p>
+                Record the sale in your own words. Trada prepares a draft; nothing is recorded yet.
+              </p>
+            </div>
+            <div className="voice-draft-entry__actions">
+              <Button
+                type="button"
+                variant="secondary"
+                loading={voiceDraftState.isLoading && !isRecordingVoice}
+                onClick={() =>
+                  isRecordingVoice ? stopVoiceRecording() : void startVoiceRecording()
+                }
+                icon={
+                  isRecordingVoice ? (
+                    <Square aria-hidden="true" size={16} fill="currentColor" />
+                  ) : (
+                    <Mic aria-hidden="true" size={17} />
+                  )
+                }
+              >
+                {isRecordingVoice ? 'Stop and prepare draft' : 'Start voice recording'}
+              </Button>
+              <small>
+                {isRecordingVoice
+                  ? `Recording ${formatRecordingDuration(recordingElapsedSeconds)} â€” tap stop when you have finished speaking.`
+                  : 'AI drafts do not create a sale. Review before using any detail below.'}
+              </small>
+            </div>
+            {audioPreview && (
+              <div className="voice-recording-preview" aria-live="polite">
+                <div>
+                  <strong>Recording ready</strong>
+                  <span>
+                    {formatRecordingDuration(audioPreview.durationSeconds)} Â·{' '}
+                    {formatFileSize(audioPreview.blob.size)}
+                  </span>
+                </div>
+                <audio controls preload="metadata" src={audioPreview.url}>
+                  Your browser cannot play this recording.
+                </audio>
+                <div className="voice-recording-preview__actions">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    loading={voiceDraftState.isLoading}
+                    onClick={prepareAudioVoiceDraft}
+                  >
+                    Prepare audio draft
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={discardAudioPreview}>
+                    Discard recording
+                  </Button>
+                </div>
+              </div>
+            )}
+            <details className="voice-draft-entry__fallback">
+              <summary>Canâ€™t record? Type a sale description instead</summary>
+              <FormField
+                htmlFor="voice-sale-transcript"
+                label="Sale description"
+                hint="For example: Musa bought 3 bags of rice and paid 120k by transfer."
+              >
+                <Textarea
+                  id="voice-sale-transcript"
+                  rows={3}
+                  value={voiceTranscript}
+                  onChange={(event) => setVoiceTranscript(event.target.value)}
+                  placeholder="Describe the items, payment and customer details"
+                />
+              </FormField>
+              <Button
+                type="button"
+                variant="ghost"
+                loading={voiceDraftState.isLoading}
+                onClick={prepareTypedVoiceDraft}
+                icon={<FilePenLine aria-hidden="true" size={17} />}
+              >
+                Prepare typed draft
+              </Button>
+            </details>
+            {voiceError && <Alert tone="warning">{voiceError}</Alert>}
+          </Surface>
+
+          {voiceDraft && (
+            <Surface className="checkout-section voice-draft-review" aria-live="polite">
+              <div className="form-section-heading">
+                <h2>Review AI draft</h2>
+                <p>Confirm every extracted detail before placing it in checkout.</p>
+              </div>
+              <Alert tone="warning">
+                No sale has been recorded. Use the normal confirmation button after reviewing the
+                checkout.
+              </Alert>
+              <div className="voice-draft-review__transcript">
+                <span>Transcript</span>
+                <p>{voiceDraft.transcript}</p>
+              </div>
+              {draftItems.length > 0 ? (
+                <ul className="voice-draft-review__items" aria-label="AI-drafted sale items">
+                  {draftItems.map((item, index) => (
+                    <li key={`${item.productId ?? item.productName ?? 'item'}-${index}`}>
+                      <strong>{item.productName ?? 'Unmatched product'}</strong>
+                      <span>
+                        {item.quantity ?? '—'} ×{' '}
+                        {item.unitPrice == null
+                          ? 'price needed'
+                          : formatNaira.format(item.unitPrice)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Alert tone="warning">
+                  No sale items were extracted. Add products manually below.
+                </Alert>
+              )}
+              {draftItemsMissingCheckoutData.length > 0 && (
+                <Alert tone="warning">
+                  Some draft items are missing a product match, quantity or price in your current
+                  catalog. Add or correct them manually.
+                </Alert>
+              )}
+              {items.length > 0 && (
+                <Alert tone="info">
+                  Your current cart is unchanged. Clear or finish it before applying a voice draft.
+                </Alert>
+              )}
+              <div className="voice-draft-review__actions">
+                <Button type="button" onClick={applyVoiceDraft} disabled={!canApplyVoiceDraft}>
+                  Use matching details in checkout
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setVoiceDraft(undefined)}>
+                  Discard draft
+                </Button>
+              </div>
+            </Surface>
+          )}
           <Surface className="checkout-section">
             <div className="form-section-heading">
               <h2>Products</h2>
@@ -444,4 +787,23 @@ function CheckoutField({
       <Input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} />
     </FormField>
   );
+}
+
+function recordingToDataUrl(recording: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener('load', () => resolve(String(reader.result)));
+    reader.addEventListener('error', () => reject(reader.error));
+    reader.readAsDataURL(recording);
+  });
+}
+
+function formatRecordingDuration(durationSeconds: number) {
+  const minutes = Math.floor(durationSeconds / 60);
+  const seconds = durationSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function formatFileSize(bytes: number) {
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }

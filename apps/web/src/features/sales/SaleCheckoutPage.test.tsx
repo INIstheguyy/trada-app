@@ -1,11 +1,18 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router';
-import { expect, test, vi } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { store } from '../../app/store';
 import { SaleCheckoutPage } from './SaleCheckoutPage';
+
+const mocks = vi.hoisted(() => ({ createVoiceSaleDraft: vi.fn() }));
+
+afterEach(() => {
+  cleanup();
+  mocks.createVoiceSaleDraft.mockReset();
+});
 
 vi.mock('../../lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/api')>();
@@ -16,6 +23,7 @@ vi.mock('../../lib/api', async (importOriginal) => {
       isLoading: false,
     }),
     useCreateSaleMutation: () => [vi.fn(), { isLoading: false }],
+    useCreateVoiceSaleDraftMutation: () => [mocks.createVoiceSaleDraft, { isLoading: false }],
   };
 });
 
@@ -33,4 +41,45 @@ test('keeps booked revenue, received cash and outstanding balance distinct', () 
   expect(screen.getByText('Balance due')).toBeInTheDocument();
   expect(screen.getByText('Record only money already received.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Confirm and record sale' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Start voice recording' })).toBeInTheDocument();
+});
+
+test('prepares a non-persisted voice draft before it changes checkout', async () => {
+  mocks.createVoiceSaleDraft.mockReturnValue({
+    unwrap: async () => ({
+      transcript: 'Musa bought three bags of rice and paid 120k by transfer.',
+      sale: {
+        customerName: 'Musa',
+        amountPaid: 120000,
+        paymentMethod: 'transfer',
+        items: [],
+      },
+    }),
+  });
+
+  render(
+    <Provider store={store}>
+      <MemoryRouter>
+        <SaleCheckoutPage />
+      </MemoryRouter>
+    </Provider>,
+  );
+
+  fireEvent.change(screen.getByLabelText('Sale description'), {
+    target: { value: 'Musa bought three bags of rice and paid 120k by transfer.' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Prepare typed draft' }));
+
+  await waitFor(() =>
+    expect(mocks.createVoiceSaleDraft).toHaveBeenCalledWith({
+      text: 'Musa bought three bags of rice and paid 120k by transfer.',
+    }),
+  );
+  expect(await screen.findByRole('heading', { name: 'Review AI draft' })).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      'No sale has been recorded. Use the normal confirmation button after reviewing the checkout.',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Use matching details in checkout' })).toBeDisabled();
 });

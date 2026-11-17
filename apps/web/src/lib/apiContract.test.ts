@@ -7,6 +7,7 @@ import {
   parseRefreshResponse,
   parseSaleResponse,
   parseSalesResponse,
+  parseVoiceSaleDraftResponse,
 } from './api';
 
 describe('authentication response compatibility', () => {
@@ -236,5 +237,67 @@ describe('sale response contract', () => {
     expect(result.sales).toHaveLength(1);
     expect(result.sales[0].totalAmount).toBe(900);
     expect(result.sales[0].items[0].quantity).toBe(3);
+  });
+});
+
+describe('voice sale draft contract', () => {
+  test('accepts the documented non-persisted voice sale draft', () => {
+    const result = parseVoiceSaleDraftResponse({
+      success: true,
+      message: 'Sale draft extracted from voice',
+      data: {
+        transcript: 'Musa buy 3 bags of rice, transfer 120k',
+        sale: {
+          customerName: 'Musa',
+          totalAmount: '120000.00',
+          amountPaid: '120000.00',
+          paymentMethod: 'transfer',
+          paymentStatus: 'paid',
+          items: [
+            {
+              productId: 'rice-prod-uuid',
+              productName: 'Rice 50kg',
+              quantity: '3.00',
+              unitPrice: '40000.00',
+              totalPrice: '120000.00',
+            },
+          ],
+        },
+        extractedFields: {
+          customerName: 'Musa',
+          amountPaid: 120000,
+          paymentMethod: 'transfer',
+        },
+      },
+    });
+
+    expect(result.sale).toMatchObject({ totalAmount: 120000, amountPaid: 120000 });
+    expect(result.sale?.items[0]).toMatchObject({ quantity: 3, unitPrice: 40000 });
+  });
+
+  test('accepts an extracted-fields-only draft when the backend returns sale as null', () => {
+    const result = parseVoiceSaleDraftResponse({
+      success: true,
+      message: 'Sale draft extracted from voice',
+      data: {
+        transcript: 'Sold 4 spanners and collected 1k cash.',
+        sale: null,
+        extractedFields: {
+          items: [
+            {
+              productId: '99514db9-977c-46b3-8887-11a9b0a58524',
+              quantity: 4,
+              unitPrice: 1000,
+            },
+          ],
+          paymentMethod: 'cash',
+          paymentStatus: 'paid',
+          amountPaid: 1000,
+        },
+      },
+    });
+
+    expect(result.sale).toBeNull();
+    expect(result.extractedFields?.items?.[0]).toMatchObject({ quantity: 4, unitPrice: 1000 });
   });
 });

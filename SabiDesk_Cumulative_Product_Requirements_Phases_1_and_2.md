@@ -1588,3 +1588,95 @@ These items require clarification before the frontend treats the backend as the 
 **Asset limitation:** The supplied JPEG is now used, but a transparent SVG or high-resolution transparent PNG remains preferable for final production branding, particularly on the navy sidebar.
 
 **Next session target:** Manually verify the account menu and logo at supported breakpoints, obtain a transparent/vector logo source, and integrate backend refresh-token revocation when the logout contract is delivered.
+
+### Session 024 — AI module specification review and integration plan
+
+**Date:** 16 November 2026
+**Outcome:** The new AI endpoint specification was reviewed against Trada's initial product requirements and current merchant application. The API creates a viable foundation for voice-assisted sales and inventory capture, but no AI UI is enabled until it can honour the PRD's draft-first, reviewable and risk-aware record-creation rules.
+
+**Specification reviewed:**
+
+- Unified authenticated voice processing at `POST /voice` and `POST /voice/process` for sale, product creation and product update intent.
+- Dedicated voice flows for sales, inventory creation/update and a currently viewed product.
+- Image-based product creation using Vision.
+- Browser-compatible base64/data-URL audio support, text fallback, Nigerian commercial language handling, and documented common errors.
+- Voice endpoints provide `save: false` draft mode; their documented default remains `save: true` automatic persistence.
+
+**PRD alignment and decision:**
+
+- The endpoints support the established direction for Nigerian voice-assisted capture, manual fallback and product-photo assistance.
+- The default auto-save behavior conflicts with the PRD: AI output is a draft, not an authoritative sale or inventory record, and consequential changes require review appropriate to risk.
+- The frontend will never rely on the backend default. It must explicitly request `save: false`, render a correctable review state and require deliberate merchant confirmation.
+- The image product endpoint has no documented draft mode, so it remains unavailable until the backend adds preview/confirmation behavior.
+- Product update/restock voice results remain preview-only until quantity `add`/`subtract`/`set` has a stock-movement, audit, conflict and authorization contract.
+- Ask Sabi, daily briefings, receipt/book ingestion, marketing generation, batch image capture and storefront AI remain future tracks because this specification does not provide their contracts.
+
+**Recommended implementation order:**
+
+1. Harden contracts: draft/confirm semantics, idempotency, field confidence/ambiguity, permissions, inventory safety, privacy/retention and complete failure behavior.
+2. Implement text-first voice-sale drafts in existing checkout using `POST /sales/from-voice` with `save: false`; merchant review then uses the existing standard sale write endpoint.
+3. Add browser microphone capture (`audio/webm`) only after the transcript path works, with permission, discard/re-record, size/duration, failure and manual fallback states.
+4. Add voice-assisted product creation by prefilling the existing product form from a `save: false` draft.
+5. Add product-edit suggestions as review-only, then defer photo capture and the unified assistant until draft and inventory-control contracts exist.
+
+**Critical backend gaps recorded:**
+
+- No immutable draft identifier/confirm endpoint or equivalent deterministic confirmation model.
+- No idempotency contract to prevent duplicate sales after retries or repeated recording.
+- No field-level confidence, unresolved-field or product-match candidate data.
+- No approval/audit/permission model for AI-driven stock and price changes.
+- No documented audio/image retention, consent, limits, quota/rate-limit or asynchronous processing contract.
+- The known nested password-hash exposure must be fixed before broader AI production rollout.
+
+**Deliverable:** Added `AI_MODULE_INTEGRATION_PLAN.md` containing endpoint inventory, PRD comparison, now-vs-later scope, backend decisions, phased end-to-end process, release gates and test safeguards.
+
+**Implementation boundary:** This session added no AI routes, recording code, image upload, persistence call or new feature claim. Manual sales and product workflows remain canonical until the contract gates are met.
+
+**Next session target:** Obtain the listed backend decisions, then implement the text-first draft-only voice-sale review slice with contract fixtures and no automatic persistence.
+
+### Session 025 — Draft-only voice-sale checkout implementation
+
+**Date:** 16 November 2026
+**Outcome:** The first AI-assisted capture slice is implemented locally as a microphone-first, draft-only workflow inside the existing sale checkout. It neither creates a sale through an AI endpoint nor permits automatic persistence.
+
+**Completed:**
+
+- Added browser microphone capture using `MediaRecorder`, producing an `audio/webm` data URL for the documented API contract; start and stop are explicit and microphone permission failure has a clear fallback.
+- Kept typed sale description as a secondary fallback for unavailable permissions, unsupported browsers or unsuccessful audio capture.
+- Added a typed `POST /sales/from-voice` mutation that always sends `{ text, save: false }`, including normalization of documented decimal-string response fields.
+- Added a visible review state that displays the returned transcript and proposed line items and explicitly states that no sale has been recorded.
+- Limited draft application to an empty cart with valid quantities, prices and currently matched product IDs. The existing checkout remains the place to correct all values.
+- Retained the normal confirmed `POST /sales` submission as the only action that records a sale; existing manual checkout remains the recovery path after an AI failure.
+- Added contract and checkout tests covering a decimal-string draft response and incomplete-draft safety.
+
+**Verification:**
+
+- Focused API-contract and checkout coverage passed: 12 tests across 2 files.
+- Full quality check passed: lint, typecheck, 40 tests across 17 files, and the production PWA build.
+- The build generated 34 precache entries; the entry bundle was 463.90 kB minified (146.98 kB gzip).
+
+**Live and backend gates still open:**
+
+- Validate in a production test business that `save: false` performs no write and that the returned sale draft consistently supplies the fields used by checkout.
+- Obtain the missing draft/confirm, idempotency, confidence, permissions, inventory-safety, privacy/retention and error contracts before widening the feature.
+- Keep product image capture, stock-changing AI actions and the unified assistant out of production until their individual gates are met. Release microphone capture only after a live production-test-business smoke test confirms draft-only behavior.
+- Resolve the known nested password-hash exposure before a broader AI rollout.
+
+**Next session target:** Smoke-test browser audio and typed fallback against the draft endpoint once backend confirmation arrives, then add explicit consent, discard/re-record and size/duration controls before release.
+
+### Session 026 — Browser audio preview before voice-draft processing
+
+**Date:** 16 November 2026
+**Outcome:** Voice-sale recording now has a browser-only review step before any audio is sent to the AI endpoint.
+
+**Completed:**
+
+- Added a live elapsed recording timer.
+- After recording stops, display the duration and Blob file size with a native replay control.
+- Added explicit **Prepare audio draft** and **Discard recording** actions; stopping a recording no longer immediately uploads it.
+- Kept the audio only in in-memory browser Blob/Object URL storage. It is released when discarded, replaced or the checkout unmounts; no persistent frontend storage was added.
+- Corrected the voice-draft schema to accept the backend's valid `sale: null` plus `extractedFields` response shape.
+
+**Verification:** Focused API-contract and checkout coverage passed: 13 tests across 2 files. Web typecheck and diff hygiene passed.
+
+**Known release gate:** A 413 response was observed for an approximately 137 KB JSON base64 audio request. Backend/DevOps must confirm and document the effective application/proxy/gateway body limit. The next frontend hardening pass should add a tested recording duration and encoded-payload-size guard based on that confirmed limit.

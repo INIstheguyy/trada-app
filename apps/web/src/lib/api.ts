@@ -221,6 +221,53 @@ const saleAnalyticsSchema = z.object({
   unpaidBalance: decimalNumberSchema,
 });
 
+const voiceSaleDraftItemSchema = z.object({
+  productId: z.string().optional(),
+  productName: z.string().optional(),
+  quantity: decimalNumberSchema.optional(),
+  unitPrice: decimalNumberSchema.optional(),
+  discountAmount: decimalNumberSchema.optional(),
+  totalPrice: decimalNumberSchema.optional(),
+});
+const voiceSaleDraftSchema = z.object({
+  transcript: z.string(),
+  sale: z
+    .object({
+      customerName: z.string().optional().nullable(),
+      customerPhone: z.string().optional().nullable(),
+      customerEmail: z.string().optional().nullable(),
+      subtotal: decimalNumberSchema.optional(),
+      discountAmount: decimalNumberSchema.optional(),
+      taxAmount: decimalNumberSchema.optional(),
+      totalAmount: decimalNumberSchema.optional(),
+      amountPaid: decimalNumberSchema.optional(),
+      balanceDue: decimalNumberSchema.optional(),
+      paymentMethod: paymentMethodSchema.optional(),
+      paymentStatus: paymentStatusSchema.optional(),
+      notes: z.string().optional().nullable(),
+      items: z.array(voiceSaleDraftItemSchema).default([]),
+    })
+    .nullable()
+    .optional(),
+  extractedFields: z
+    .object({
+      customerName: z.string().optional().nullable(),
+      customerPhone: z.string().optional().nullable(),
+      customerEmail: z.string().optional().nullable(),
+      paymentMethod: paymentMethodSchema.optional(),
+      paymentStatus: paymentStatusSchema.optional(),
+      amountPaid: decimalNumberSchema.optional(),
+      discountAmount: decimalNumberSchema.optional(),
+      taxAmount: decimalNumberSchema.optional(),
+      items: z.array(voiceSaleDraftItemSchema).optional(),
+    })
+    .optional(),
+});
+
+export function parseVoiceSaleDraftResponse(response: unknown) {
+  return apiEnvelopeSchema(voiceSaleDraftSchema).parse(response).data;
+}
+
 export function parseSaleResponse(response: unknown) {
   return apiEnvelopeSchema(saleSchema).parse(response).data;
 }
@@ -243,6 +290,8 @@ export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
 export type SaleStatus = z.infer<typeof saleStatusSchema>;
 export type Sale = z.infer<typeof saleSchema>;
 export type SaleAnalytics = z.infer<typeof saleAnalyticsSchema>;
+export type VoiceSaleDraft = z.infer<typeof voiceSaleDraftSchema>;
+export type VoiceSaleDraftRequest = { text: string } | { audio: string; mimeType: string };
 export type CreateSaleInput = {
   customerName?: string;
   customerPhone?: string;
@@ -470,6 +519,14 @@ export const api = createApi({
         { type: 'Product', id: 'LOW_STOCK' },
       ],
     }),
+    createVoiceSaleDraft: builder.mutation<VoiceSaleDraft, VoiceSaleDraftRequest>({
+      query: (input) => ({
+        url: '/sales/from-voice',
+        method: 'POST',
+        body: { ...input, save: false },
+      }),
+      transformResponse: parseVoiceSaleDraftResponse,
+    }),
     cancelSale: builder.mutation<
       Pick<Sale, 'id' | 'receiptNumber' | 'status' | 'paymentStatus' | 'totalAmount'>,
       string
@@ -522,6 +579,7 @@ export const {
   useGetSalesQuery,
   useGetSaleQuery,
   useCreateSaleMutation,
+  useCreateVoiceSaleDraftMutation,
   useCancelSaleMutation,
   useGetSalesAnalyticsQuery,
 } = api;

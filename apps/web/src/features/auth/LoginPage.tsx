@@ -55,15 +55,18 @@ export function LoginPage() {
 
   return (
     <AuthLayout
-      eyebrow="Your business, clearly understood"
-      title="Know what is happening, even when you are away."
-      description="Keep sales, stock and outstanding payment records together, then see what needs your attention."
-      trustMessage="Your workspace is available only to authenticated and authorised users."
+      initialMobileOpen={Boolean(locationState?.registrationComplete)}
+      mobileActionLabel="Sign in"
+      mobileAlternateAction={{
+        prompt: 'New to Trada?',
+        label: 'Create an account',
+        to: '/register',
+      }}
     >
       <AuthHeading
         eyebrow="Welcome back"
-        title="Sign in to Trada"
-        description="Use the email and password connected to your account."
+        title="Welcome back"
+        description="Access your Trada business account."
       />
 
       <form className="access-form" onSubmit={handleSubmit}>

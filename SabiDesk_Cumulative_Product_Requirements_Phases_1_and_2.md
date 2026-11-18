@@ -2,7 +2,7 @@
 
 **Coverage:** Phase One and Phase Two, with explicitly separated future vision  
 **Document type:** Product requirements context and business/product analysis — **not a technical requirements specification**  
-**Version:** 1.1 | **Prepared:** 3 November 2026 | **Implementation status updated:** 17 November 2026
+**Version:** 1.1 | **Prepared:** 3 November 2026 | **Implementation status updated:** 18 November 2026
 **Intended use:** Source context for a separate technical requirements, design system, UX, and engineering planning exercise.
 
 > **Important:** This compilation consolidates the decisions, product directions, concepts and suggestions developed in the Trada conversations. A feature being discussed does not mean it has been approved, built, or committed to Phase One. The Phase One/Phase Two split below is a **recommended consolidation** of our evolving scope, not a formally signed-off release contract. This distinction matters because previous conversations used terms such as MVP, V2, “next,” and “later” at different times.
@@ -1869,3 +1869,134 @@ These items require clarification before the frontend treats the backend as the 
 **Verification:** Web typecheck and lint passed. The relevant business-route tests passed in isolation after the full parallel suite experienced unrelated 5-second timing failures; a serialized full-suite run exceeded the local command time limit. The AI contract suite remains green.
 
 **Boundary:** Candidate matches are useful evidence, not proof that the first product is correct. The merchant remains responsible for reviewing the recognised primary product and the resulting sale or inventory change.
+
+### Session 036 — Landing-aligned authentication visual system
+
+**Date:** 18 November 2026
+**Outcome:** Re-engineered the sign-in, registration and business-onboarding presentation around the live Trada landing page and the final PM auth references while preserving the supported authentication and onboarding contracts.
+
+**Completed:**
+
+- Added a reusable transparent `BrandLogo` component with dark- and light-surface variants, plus standalone dark and light SVG brand marks. The supplied JPEG is no longer placed as a white rectangle on coloured surfaces.
+- Centralised the auth story in the shared layout using the approved hero, supporting statement and four benefit messages from the final references.
+- Aligned the module with the landing-page visual language: deep navy-to-teal surfaces, aqua emphasis, Bricolage Grotesque display type, Figtree body type, translucent benefit cards and softer form surfaces.
+- Refined the responsive composition into a two-column desktop experience and a compact mobile story with a readable 2-by-2 benefit grid followed by the account form.
+- Updated the sign-in and registration page headings without changing their fields, validation, API calls or navigation behavior.
+- Retained the current email-and-password sign-in contract and the existing registration fields. Phone sign-in, OTP, social login and combined business creation were not inferred from the concept images.
+
+**Product and asset boundaries:**
+
+- The auth copy now reflects the approved marketing direction, including website and BNPL outcomes. This visual/copy alignment does not mark storefront or BNPL workflows as newly implemented; capability status remains unchanged and those actions must stay gated until their product and backend contracts are delivered.
+- The merchant/business-owner scene from the PM composites was not extracted from a screenshot or embedded as a production asset. A licensed, approved original photograph or illustration is still required before that scene is added faithfully.
+- The new transparent marks are code-native reproductions of the supplied raster logo for immediate interface use. An official vector brand master should replace them if brand supplies one later.
+
+**Verification:** ESLint and TypeScript checks passed. Focused sign-in, registration and business-onboarding tests passed: 3 tests across 3 files. The production PWA build passed with 34 precache entries. Desktop and mobile auth renders were inspected locally after the responsive adjustments.
+
+**Next session target:** Review the next screen module against the same landing/reference language, then classify every proposed visual or content change as direct implementation, contract-gated behavior or missing production asset before editing it.
+
+### Session 037 — Mobile auth sheets and desktop scroll containment
+
+**Date:** 18 November 2026
+**Outcome:** Simplified the first mobile authentication view and corrected desktop overflow behavior without changing authentication data or API contracts.
+
+**Completed:**
+
+- Collapsed the sign-in and registration forms behind route-specific mobile calls to action: **Sign in** and **Get started**.
+- Added a full-height form sheet that animates upward over the auth story, preserves entered values, provides a persistent close control and returns to the story when dismissed.
+- Added keyboard behavior: Escape closes an open sheet, focus returns to its trigger, and the trigger exposes its expanded state to assistive technology.
+- Added the alternate account route beneath each mobile trigger. A successful registration redirect opens the sign-in sheet immediately so its confirmation message is not hidden behind the story.
+- Kept business onboarding on the existing non-collapsed layout; the sheet behavior is explicitly enabled only by sign-in and registration.
+- Constrained the desktop auth layout to the viewport, removed the unnecessary story-panel scrollbar and made the account-form panel the only independently scrollable column.
+- Hid scrollbar chrome while retaining mouse-wheel, trackpad, touch and keyboard scrolling on the longer registration form.
+
+**Verification:** ESLint and TypeScript checks passed. Focused sign-in, registration and business-onboarding coverage passed: 3 tests across 3 files, including open/close state assertions. The production PWA build passed with 35 precache entries. Closed and open mobile states were inspected at 500 by 1000 pixels, and desktop registration was inspected at 1440 by 800 pixels.
+
+**Boundary:** This is a presentation and navigation-state change only. Registration fields, sign-in fields, validation rules, authentication requests, redirects and RBAC behavior remain unchanged.
+
+**Next session target:** Continue the module-by-module visual review with the next screen selected by product, reusing the established brand hierarchy and documenting any proposed behavior that exceeds the available frontend or backend contract.
+
+### Session 038 — Mobile and tablet auth overflow correction
+
+**Date:** 18 November 2026
+**Outcome:** Removed the remaining mobile/tablet auth overflow and added a resilient composition for short-height devices.
+
+**Root cause:** The story content fit the tested viewports, but the large decorative ring pseudo-elements extended beyond the story boundary. Because the story had become a scroll container, those decorations increased its horizontal and vertical scrollable area even though no content element crossed the viewport.
+
+**Completed:**
+
+- Clipped decorative story artwork at the mobile/tablet panel boundary so it no longer creates horizontal or vertical scrolling.
+- Preserved the fixed one-screen story and upward form-sheet interaction.
+- Added a short-height responsive mode that reduces spacing, logo and heading scale, control height and trust-copy density.
+- On narrow short phones, removed benefit descriptions while retaining every benefit title and icon so the primary action and trust statement remain visible without scrolling.
+
+**Verification:** Exact browser emulation confirmed document width and height matched the viewport at 390 by 844, 768 by 1024, 390 by 667 and 768 by 600 pixels. The standard phone, short phone, portrait tablet and short tablet-landscape compositions were visually inspected. The production PWA build passed with 35 precache entries, and diff hygiene passed.
+
+**Boundary:** The account form sheet remains independently scrollable where the registration fields are taller than the available device height; only unintended story/page overflow was removed.
+
+### Session 039 — Viewport-relative auth spacing and focus-zoom prevention
+
+**Date:** 18 November 2026
+**Outcome:** Rebalanced mobile and tablet auth composition against the available screen height and removed automatic mobile-browser zoom when focusing account fields.
+
+**Completed:**
+
+- Replaced the mobile/tablet story's compressed flex distribution with a three-row viewport grid: brand at the top, the main story and action centred within the available middle region, and the trust statement anchored at the bottom.
+- Converted outer padding, inter-section gaps, headline margins, benefit spacing, action spacing and trust padding to bounded `svh` values so taller tablets gain breathing room while short phones remain compact.
+- Retained the separate short-height mode and narrow-phone benefit simplification established in Session 038.
+- Set authentication input, select and textarea text to 16 pixels. This prevents iOS Safari's automatic focus zoom without disabling user-controlled pinch zoom or changing the viewport accessibility policy.
+
+**Verification:** Exact browser emulation confirmed a viewport-sized document, grid story layout and 16-pixel form-control text at 390 by 844 and 768 by 1024 pixels. A 390 by 667 short-phone layout was also inspected and retained clear separation between the brand, content and trust regions. The production PWA build passed with 35 precache entries, and diff hygiene passed.
+
+**Boundary:** Height-relative spacing changes only the presentation layer. The mobile sheet interaction, authentication requests, validation, redirects and RBAC behavior remain unchanged.
+
+### Session 040 — Dynamic mobile viewport lock
+
+**Date:** 18 November 2026
+**Outcome:** Removed the remaining iOS Safari white strip and page-shift behavior by making the auth experience a true viewport-locked surface.
+
+**Root cause:** The auth story used the static small-viewport unit (`svh`). When Safari's address or navigation chrome changed the visible viewport, the document could retain a vertical scroll offset while the story stayed at the smaller static height. This shifted the logo above the visible area and exposed the white document background beneath the story.
+
+**Completed:**
+
+- Added a scoped document viewport lock while sign-in or registration is mounted; the class is removed automatically when leaving those routes.
+- Pinned the mobile/tablet auth layout to the viewport with fixed positioning and `inset: 0`, preventing body scrolling and rubber-band exposure of the page background.
+- Added dynamic viewport height (`dvh`) for the layout, story and form sheet while retaining `svh` as the compatibility fallback.
+- Added regression coverage confirming the viewport-lock class is active on the login experience.
+
+**Verification:** At a 390 by 844 emulated viewport, the document and auth layout were exactly 844 pixels high and a forced 200-pixel page-scroll attempt remained at `scrollY: 0`. After changing the live viewport height to 720 pixels to simulate mobile browser chrome, the document and layout both immediately became exactly 720 pixels high with top `0`, bottom `720` and no exposed body area. The compact result was visually inspected. ESLint, TypeScript, 2 focused auth tests and the production PWA build passed.
+
+**Boundary:** The registration form sheet can still scroll internally when its fields exceed the available height. The page and story themselves are locked to the visible viewport.
+
+### Session 041 — Expanded mobile story distribution
+
+**Date:** 18 November 2026
+**Outcome:** Used more of the available mobile centre height for meaningful auth content and removed the login workspace notice.
+
+**Completed:**
+
+- Grouped the story into an introduction, benefit grid and account action so the mobile/tablet middle region can distribute those sections rather than centre one compact natural-height block.
+- Made the middle content stretch across its available grid row and distribute its three groups with viewport-relative gaps.
+- Added a no-trust story variant so removing the bottom notice also removes its unused grid row.
+- Removed “Your workspace is available only to authenticated and authorised users” from the login experience. Registration retains its separate password-security assurance.
+- Added regression coverage confirming the removed login message is not rendered.
+
+**Verification:** At 390 by 844 pixels, the middle story region occupied 723 pixels while the document remained exactly one viewport high and no login trust message was present. The composition was visually inspected. ESLint, TypeScript, 2 focused auth tests and the production PWA build passed.
+
+**Boundary:** This changes auth presentation only. The login form, request, validation, redirects and access-control behavior are unchanged.
+
+### Session 042 — Draggable mobile auth sheet and spacing refinement
+
+**Date:** 18 November 2026
+**Outcome:** Improved the mobile/tablet auth hierarchy and converted the form-sheet handle from a decorative element into a working drag control.
+
+**Completed:**
+
+- Added more responsive separation between the introductory heading/subtext and the business-benefit grid.
+- Increased the gap below the primary “Get started” or “Sign in” action and increased the alternate-account text size for clearer reading and tapping context.
+- Limited the open account form sheet to 80 percent of the dynamic viewport, leaving the branded top region and Trada logo visible.
+- Added touch, pen and mouse pointer handling to the sheet bar. Users can drag down to dismiss the sheet; an incomplete gesture returns it to the open position.
+- Kept the close button as an explicit keyboard-accessible alternative and retained independent form scrolling inside the shortened sheet.
+
+**Verification:** ESLint, TypeScript, focused authentication tests and the production PWA build were run after integration.
+
+**Boundary:** The sheet only follows downward gestures and closes after a bounded distance threshold. Authentication requests, field validation, redirects and RBAC behavior are unchanged.

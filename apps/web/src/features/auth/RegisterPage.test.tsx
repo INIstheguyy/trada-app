@@ -16,6 +16,11 @@ test('rejects mismatched passwords before registration', () => {
     </Provider>,
   );
 
+  const panel = document.getElementById('access-account-panel');
+  expect(panel).not.toHaveClass('is-mobile-open');
+  fireEvent.click(screen.getByRole('button', { name: 'Get started' }));
+  expect(panel).toHaveClass('is-mobile-open');
+
   fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Tola' } });
   fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'Okafor' } });
   fireEvent.change(screen.getByLabelText('Email address'), {

@@ -22,10 +22,6 @@ const initialBusiness: BusinessInput = {
 };
 
 const onboardingStory = {
-  eyebrow: 'Create your private workspace',
-  title: 'Give every product and sale the right business context.',
-  description:
-    'Your workspace connects the records you create and keeps them separate from every other Trada business.',
   trustMessage: 'Your business starts private. This setup does not publish a storefront.',
 };
 

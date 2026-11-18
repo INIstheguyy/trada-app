@@ -8,6 +8,7 @@ export { Surface } from './primitives/Surface';
 export { Textarea } from './primitives/Textarea';
 export { EmptyState } from './patterns/EmptyState';
 export { PageHeader } from './patterns/PageHeader';
+export { BrandLogo } from './patterns/BrandLogo';
 export { StatCard } from './patterns/StatCard';
 export { AppShell } from './layouts/AppShell';
 export type { AppShellNavigationItem } from './layouts/AppShell';

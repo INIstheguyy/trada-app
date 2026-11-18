@@ -52,15 +52,18 @@ export function RegisterPage() {
 
   return (
     <AuthLayout
-      eyebrow="Start with a trustworthy record"
-      title="Set up the account that will own your business workspace."
-      description="Create your personal account first. Your business details stay separate and come next."
+      mobileActionLabel="Get started"
+      mobileAlternateAction={{
+        prompt: 'Already have an account?',
+        label: 'Sign in',
+        to: '/login',
+      }}
       trustMessage="Your password is transmitted securely and is never displayed back to you."
     >
       <AuthHeading
-        eyebrow="Create account"
-        title="Tell us about yourself"
-        description="Use contact details you control and can access again."
+        eyebrow="Get started"
+        title="Create your Trada account"
+        description="Create your account first, then set up your business workspace in minutes."
       />
 
       <form className="access-form" onSubmit={handleSubmit}>

@@ -315,3 +315,49 @@
     flex: 1;
   }
 }
+/* Transparent Trada brand lockup. Size through --sd-brand-mark-size when needed. */
+.sd-brand-logo {
+  --sd-brand-mark-size: 46px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--sd-navy-900);
+  font-family: 'Figtree', Inter, ui-sans-serif, system-ui, sans-serif;
+  line-height: 1;
+}
+.sd-brand-logo--light {
+  color: var(--sd-white);
+}
+.sd-brand-logo__mark {
+  width: var(--sd-brand-mark-size);
+  height: var(--sd-brand-mark-size);
+  flex: none;
+  overflow: visible;
+}
+.sd-brand-logo__mark-top {
+  fill: currentColor;
+}
+.sd-brand-logo__mark-accent {
+  fill: var(--sd-teal-500);
+}
+.sd-brand-logo--light .sd-brand-logo__mark-accent {
+  fill: #21e6d5;
+}
+.sd-brand-logo__copy {
+  display: grid;
+  gap: 3px;
+}
+.sd-brand-logo__copy strong {
+  font-size: calc(var(--sd-brand-mark-size) * 0.69);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+}
+.sd-brand-logo__copy small {
+  color: var(--sd-text-muted);
+  font-size: calc(var(--sd-brand-mark-size) * 0.22);
+  font-weight: 650;
+  letter-spacing: 0.015em;
+}
+.sd-brand-logo--light .sd-brand-logo__copy small {
+  color: rgba(255, 255, 255, 0.76);
+}

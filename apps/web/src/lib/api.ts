@@ -98,6 +98,12 @@ const decimalNumberSchema = z.preprocess(
   (value) => (typeof value === 'string' && value.trim() !== '' ? Number(value) : value),
   z.number().finite(),
 );
+const nullableDecimalNumberSchema = z
+  .preprocess(
+    (value) => (typeof value === 'string' && value.trim() !== '' ? Number(value) : value),
+    z.number().finite().nullable(),
+  )
+  .transform((value) => value ?? 0);
 const productSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -106,7 +112,7 @@ const productSchema = z.object({
   category: z.string().optional().nullable(),
   unit: z.string(),
   quantity: decimalNumberSchema,
-  stockThreshold: decimalNumberSchema,
+  stockThreshold: nullableDecimalNumberSchema,
   costPrice: decimalNumberSchema.optional().nullable(),
   sellingPrice: decimalNumberSchema,
   discountPrice: decimalNumberSchema.optional().nullable(),
@@ -134,7 +140,7 @@ const lowStockProductSchema = z.object({
   id: z.string(),
   name: z.string(),
   quantity: decimalNumberSchema,
-  stockThreshold: decimalNumberSchema,
+  stockThreshold: nullableDecimalNumberSchema,
   unit: z.string(),
   location: z.string().optional().nullable(),
 });
@@ -164,6 +170,7 @@ export type ProductInput = Omit<
   Product,
   'id' | 'businessId' | 'createdById' | 'createdAt' | 'updatedAt'
 >;
+export type ProductUpdateInput = Partial<ProductInput> & { currentUpdatedAt?: string };
 export type ProductListParams = {
   search?: string;
   category?: string;
@@ -221,6 +228,12 @@ const saleAnalyticsSchema = z.object({
   unpaidBalance: decimalNumberSchema,
 });
 
+const candidateProductMatchSchema = z.object({
+  productId: z.string(),
+  productName: z.string(),
+  sellingPrice: decimalNumberSchema.optional(),
+  matchScore: decimalNumberSchema.optional(),
+});
 const voiceSaleDraftItemSchema = z.object({
   productId: z.string().optional(),
   productName: z.string().optional(),
@@ -228,9 +241,34 @@ const voiceSaleDraftItemSchema = z.object({
   unitPrice: decimalNumberSchema.optional(),
   discountAmount: decimalNumberSchema.optional(),
   totalPrice: decimalNumberSchema.optional(),
+  matchConfidence: decimalNumberSchema.optional(),
+  candidateMatches: z.array(candidateProductMatchSchema).optional(),
+});
+const voiceSaleConfirmationDraftSchema = z.object({
+  businessId: z.string().optional(),
+  customerName: z.string().optional().nullable(),
+  customerPhone: z.string().optional().nullable(),
+  customerEmail: z.string().optional().nullable(),
+  items: z.array(voiceSaleDraftItemSchema).default([]),
+  subtotal: decimalNumberSchema.optional(),
+  discountAmount: decimalNumberSchema.optional(),
+  taxAmount: decimalNumberSchema.optional(),
+  totalAmount: decimalNumberSchema.optional(),
+  amountPaid: decimalNumberSchema.optional(),
+  balanceDue: decimalNumberSchema.optional(),
+  paymentMethod: paymentMethodSchema.optional(),
+  paymentStatus: paymentStatusSchema.optional(),
+  notes: z.string().optional().nullable(),
+  idempotencyKey: z.string().optional(),
+});
+const aiConfidenceSchema = z.object({
+  overall: decimalNumberSchema.optional(),
+  fields: z.record(z.string(), decimalNumberSchema).optional(),
 });
 const voiceSaleDraftSchema = z.object({
+  isDraft: z.boolean().optional(),
   transcript: z.string(),
+  draft: voiceSaleConfirmationDraftSchema.optional(),
   sale: z
     .object({
       customerName: z.string().optional().nullable(),
@@ -260,12 +298,74 @@ const voiceSaleDraftSchema = z.object({
       discountAmount: decimalNumberSchema.optional(),
       taxAmount: decimalNumberSchema.optional(),
       items: z.array(voiceSaleDraftItemSchema).optional(),
-    })
+      })
     .optional(),
+  confidence: aiConfidenceSchema.optional(),
+  ambiguousFields: z.array(z.string()).optional(),
 });
 
 export function parseVoiceSaleDraftResponse(response: unknown) {
   return apiEnvelopeSchema(voiceSaleDraftSchema).parse(response).data;
+}
+
+const voiceProductDraftFieldsSchema = z.object({
+  productId: z.string().optional(),
+  productName: z.string().optional(),
+  quantityMode: z.enum(['add', 'subtract', 'set']).optional(),
+  name: z.string().optional(),
+  description: z.string().optional().nullable(),
+  type: productTypeSchema.optional(),
+  category: z.string().optional().nullable(),
+  unit: z.string().optional(),
+  quantity: decimalNumberSchema.optional(),
+  stockThreshold: decimalNumberSchema.optional().nullable(),
+  costPrice: decimalNumberSchema.optional().nullable(),
+  sellingPrice: decimalNumberSchema.optional(),
+  discountPrice: decimalNumberSchema.optional().nullable(),
+  condition: productConditionSchema.optional(),
+  location: z.string().optional().nullable(),
+  sku: z.string().optional().nullable(),
+  barcode: z.string().optional().nullable(),
+  isActive: z.boolean().optional(),
+});
+const voiceProductDraftSchema = z.object({
+  action: z.string().optional(),
+  isDraft: z.boolean().optional(),
+  transcript: z.string(),
+  draft: voiceProductDraftFieldsSchema.optional(),
+  product: voiceProductDraftFieldsSchema.nullable().optional(),
+  extractedFields: voiceProductDraftFieldsSchema.optional(),
+  stockMovement: z
+    .object({
+      productId: z.string(),
+      productName: z.string(),
+      quantityMode: z.enum(['add', 'subtract', 'set']),
+      currentQuantity: decimalNumberSchema,
+      quantityDelta: decimalNumberSchema,
+      resultingQuantity: decimalNumberSchema,
+      currentUpdatedAt: z.string(),
+    })
+    .optional(),
+  candidateMatches: z.array(candidateProductMatchSchema).optional(),
+  confidence: aiConfidenceSchema.optional(),
+  ambiguousFields: z.array(z.string()).optional(),
+});
+
+export function parseVoiceProductDraftResponse(response: unknown) {
+  return apiEnvelopeSchema(voiceProductDraftSchema).parse(response).data;
+}
+
+const imageProductResultSchema = z.object({
+  isDraft: z.boolean().optional(),
+  product: z.object({ id: z.string(), name: z.string() }).nullable().optional(),
+  draft: voiceProductDraftFieldsSchema.optional(),
+  extractedFields: voiceProductDraftFieldsSchema.optional(),
+  confidence: aiConfidenceSchema.optional(),
+  ambiguousFields: z.array(z.string()).optional(),
+});
+
+export function parseImageProductResponse(response: unknown) {
+  return apiEnvelopeSchema(imageProductResultSchema).parse(response).data;
 }
 
 export function parseSaleResponse(response: unknown) {
@@ -292,7 +392,11 @@ export type Sale = z.infer<typeof saleSchema>;
 export type SaleAnalytics = z.infer<typeof saleAnalyticsSchema>;
 export type VoiceSaleDraft = z.infer<typeof voiceSaleDraftSchema>;
 export type VoiceSaleDraftRequest = { text: string } | { audio: string; mimeType: string };
+export type VoiceProductDraft = z.infer<typeof voiceProductDraftSchema>;
+export type VoiceProductDraftRequest = VoiceSaleDraftRequest;
+export type ImageProductResult = z.infer<typeof imageProductResultSchema>;
 export type CreateSaleInput = {
+  idempotencyKey?: string;
   customerName?: string;
   customerPhone?: string;
   customerEmail?: string;
@@ -323,6 +427,7 @@ export type SaleListParams = {
 
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: import.meta.env.VITE_API_BASE_URL ?? 'https://api.trada.com.ng/api/v1',
+  timeout: 45_000,
   prepareHeaders: (headers, { getState }) => {
     const { accessToken } = (getState() as { auth: AuthState }).auth;
     if (accessToken) headers.set('authorization', `Bearer ${accessToken}`);
@@ -452,7 +557,7 @@ export const api = createApi({
         { type: 'Product', id: 'LOW_STOCK' },
       ],
     }),
-    updateProduct: builder.mutation<Product, { id: string; changes: Partial<ProductInput> }>({
+    updateProduct: builder.mutation<Product, { id: string; changes: ProductUpdateInput }>({
       query: ({ id, changes }) => ({ url: `/products/${id}`, method: 'PATCH', body: changes }),
       transformResponse: (response: unknown) =>
         apiEnvelopeSchema(
@@ -510,7 +615,12 @@ export const api = createApi({
       providesTags: (_result, _error, id) => [{ type: 'Sale', id }],
     }),
     createSale: builder.mutation<Sale, CreateSaleInput>({
-      query: (sale) => ({ url: '/sales', method: 'POST', body: sale }),
+      query: ({ idempotencyKey, ...sale }) => ({
+        url: '/sales',
+        method: 'POST',
+        body: sale,
+        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+      }),
       transformResponse: parseSaleResponse,
       invalidatesTags: [
         { type: 'Sale', id: 'LIST' },
@@ -526,6 +636,36 @@ export const api = createApi({
         body: { ...input, save: false },
       }),
       transformResponse: parseVoiceSaleDraftResponse,
+    }),
+    createVoiceProductDraft: builder.mutation<VoiceProductDraft, VoiceProductDraftRequest>({
+      query: (input) => ({
+        url: '/products/from-voice',
+        method: 'POST',
+        body: { ...input, save: false, action: 'create_product' },
+      }),
+      transformResponse: parseVoiceProductDraftResponse,
+    }),
+    createVoiceProductUpdateDraft: builder.mutation<
+      VoiceProductDraft,
+      VoiceProductDraftRequest & { id: string }
+    >({
+      query: ({ id, ...input }) => ({
+        url: `/products/${id}/from-voice`,
+        method: 'POST',
+        body: { ...input, save: false },
+      }),
+      transformResponse: parseVoiceProductDraftResponse,
+    }),
+    createProductFromImage: builder.mutation<
+      ImageProductResult,
+      { image: string; location: string }
+    >({
+      query: (input) => ({
+        url: '/products/from-image',
+        method: 'POST',
+        body: { ...input, save: false },
+      }),
+      transformResponse: parseImageProductResponse,
     }),
     cancelSale: builder.mutation<
       Pick<Sale, 'id' | 'receiptNumber' | 'status' | 'paymentStatus' | 'totalAmount'>,
@@ -580,6 +720,9 @@ export const {
   useGetSaleQuery,
   useCreateSaleMutation,
   useCreateVoiceSaleDraftMutation,
+  useCreateVoiceProductDraftMutation,
+  useCreateVoiceProductUpdateDraftMutation,
+  useCreateProductFromImageMutation,
   useCancelSaleMutation,
   useGetSalesAnalyticsQuery,
 } = api;

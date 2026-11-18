@@ -56,13 +56,20 @@ This is the recommended first implementation because it has the strongest produc
 
 Use `POST /products/from-voice` with `save: false`, then prefill the existing product form. The merchant completes or corrects product type, stock threshold, location, quantities and prices before submitting through the existing `POST /products` endpoint.
 
+**Implementation status (17 November 2026):** Complete locally. The new-product form supports browser recording with replay/discard and typed fallback, sends `save: false`, then uses the returned draft only to prefill editable fields. The existing Save product action remains the only persistence route.
+
 ### Preview-only: voice-assisted product update/restock
 
 Show suggested values from `POST /products/:id/from-voice` with `save: false`, but do not expose one-tap application of a stock change. A quantity mode of `add`, `subtract`, or `set` needs an approved inventory-movement/audit and stale-record strategy. Until then, use it only to prefill a review form.
 
+**Implementation status (17 November 2026):** A text-first preview is available on the existing product-edit page. It sends `save: false`, displays the transcript and extracted quantity/price suggestion, and provides no automatic application path. Merchants must manually edit the existing form and use Save changes. Browser microphone capture for this update endpoint remains deferred until inventory authorization/audit behavior is documented.
+
 ## 5. What is blocked or long-term
 
 - **Photo-to-product:** add `save: false`, extracted-field correction, and duplicate detection before use. The documented endpoint currently creates a product immediately.
+
+**Test-only implementation status (17 November 2026):** An explicitly labelled product-image endpoint test is available on the new-product form. It requires a selected image, location and an acknowledgement that it will immediately create a product, then displays the created product result. This is for contract validation only and does not remove the draft-mode requirement for normal product-image release.
+
 - **Unified assistant (`/voice`):** introduce after the focused sales and product flows establish trusted review patterns. Intent auto-detection should never obscure the proposed action.
 - **Automatic recording:** do not use for sales, stock changes, pricing, discounts, or payments until risk tiers, permissions, audit trails, idempotency, and approval paths exist.
 - **Handwritten book, receipt/invoice capture, marketing copy, Ask Sabi, business briefings, batch images and storefront content:** no supporting endpoint contract is present; retain as future tracks.

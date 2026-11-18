@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   parseBusinessResponse,
+  parseImageProductResponse,
   parseLoginResponse,
   parseProductResponse,
   parseProductsResponse,
@@ -161,6 +162,27 @@ describe('product response contract', () => {
       sellingPrice: 299.86,
     });
   });
+
+  test('keeps the full product list available when an older product has no stock threshold', () => {
+    const result = parseProductsResponse({
+      success: true,
+      data: [
+        { ...productionProduct, id: 'product-without-threshold', stockThreshold: null },
+        productionProduct,
+      ],
+      pagination: {
+        total: 2,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPrevPage: false,
+      },
+    });
+
+    expect(result.products).toHaveLength(2);
+    expect(result.products[0].stockThreshold).toBe(0);
+  });
 });
 
 describe('sale response contract', () => {
@@ -241,6 +263,54 @@ describe('sale response contract', () => {
 });
 
 describe('voice sale draft contract', () => {
+  test('accepts the v2 review-first draft, confidence and candidate matches', () => {
+    const result = parseVoiceSaleDraftResponse({
+      success: true,
+      isDraft: true,
+      data: {
+        isDraft: true,
+        transcript: 'Musa buy 2 cartons of Indomie and pay 20k by transfer',
+        sale: null,
+        draft: {
+          customerName: 'Musa',
+          items: [
+            {
+              productId: 'indomie-uuid',
+              productName: 'Indomie Chicken 70g',
+              quantity: 2,
+              unitPrice: 8500,
+              discountAmount: 0,
+              candidateMatches: [
+                {
+                  productId: 'indomie-onion-uuid',
+                  productName: 'Indomie Onion 70g',
+                  sellingPrice: 8500,
+                  matchScore: 0.67,
+                },
+              ],
+            },
+          ],
+          subtotal: 17000,
+          discountAmount: 0,
+          taxAmount: 0,
+          totalAmount: 17000,
+          amountPaid: 20000,
+          balanceDue: 0,
+          paymentMethod: 'transfer',
+          paymentStatus: 'paid',
+          idempotencyKey: 'draft-key',
+        },
+        confidence: { overall: 0.93, fields: { items: 0.94 } },
+        ambiguousFields: [],
+      },
+    });
+
+    expect(result.isDraft).toBe(true);
+    expect(result.draft?.items[0]).toMatchObject({ quantity: 2, unitPrice: 8500 });
+    expect(result.draft?.items[0].candidateMatches).toHaveLength(1);
+    expect(result.confidence?.overall).toBe(0.93);
+  });
+
   test('accepts the documented non-persisted voice sale draft', () => {
     const result = parseVoiceSaleDraftResponse({
       success: true,
@@ -299,5 +369,31 @@ describe('voice sale draft contract', () => {
 
     expect(result.sale).toBeNull();
     expect(result.extractedFields?.items?.[0]).toMatchObject({ quantity: 4, unitPrice: 1000 });
+  });
+});
+
+describe('image product draft contract', () => {
+  test('accepts the v2 non-persisted image draft', () => {
+    const result = parseImageProductResponse({
+      success: true,
+      isDraft: true,
+      data: {
+        isDraft: true,
+        product: null,
+        draft: {
+          name: 'Peak Evaporated Milk 400g',
+          type: 'inventory_based',
+          unit: 'tin',
+          quantity: 0,
+          sellingPrice: 2200,
+          location: 'Store A',
+        },
+        ambiguousFields: ['costPrice'],
+      },
+    });
+
+    expect(result.product).toBeNull();
+    expect(result.draft).toMatchObject({ name: 'Peak Evaporated Milk 400g', sellingPrice: 2200 });
+    expect(result.ambiguousFields).toEqual(['costPrice']);
   });
 });

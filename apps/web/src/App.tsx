@@ -180,6 +180,30 @@ function AuthenticatedShell({ children, activeNav }: { children: ReactNode; acti
   const { data: business } = useGetMyBusinessQuery();
   const fullName = user ? `${user.firstName} ${user.lastName}` : 'Trada user';
   const role = normalizeRole(user?.role ?? 'user');
+  const aiActions = [
+    ...(can(role, 'sale:create')
+      ? [
+          {
+            id: 'voice-sale',
+            label: 'Record a sale by voice',
+            description: 'Speak a sale, review the draft, then confirm it yourself.',
+            href: '/sales/new?ai=voice',
+            icon: 'sales' as const,
+          },
+        ]
+      : []),
+    ...(can(role, 'product:create')
+      ? [
+          {
+            id: 'voice-product',
+            label: 'Add a product by voice',
+            description: 'Describe a product and review editable details before saving.',
+            href: '/products/new?ai=voice',
+            icon: 'inventory' as const,
+          },
+        ]
+      : []),
+  ];
 
   function handleSignOut() {
     dispatch(signedOut());
@@ -193,7 +217,7 @@ function AuthenticatedShell({ children, activeNav }: { children: ReactNode; acti
       userRole={user?.role ?? 'user'}
       businessName={business?.name ?? 'Your business'}
       navigation={getMerchantNavigation(role)}
-      recordSaleHref={can(role, 'sale:create') ? '/sales/new' : undefined}
+      aiActions={aiActions}
       onNavigate={(href) => navigate(href)}
       onSignOut={handleSignOut}
       activeNav={activeNav}

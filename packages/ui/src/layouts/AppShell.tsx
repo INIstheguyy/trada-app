@@ -1,4 +1,16 @@
-import { Boxes, CircleUserRound, House, LogOut, Plus, ReceiptText, Settings } from 'lucide-react';
+import {
+  Boxes,
+  CircleUserRound,
+  House,
+  LogOut,
+  Mic,
+  MoreHorizontal,
+  Plus,
+  ReceiptText,
+  Settings,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState, type MouseEvent, type ReactNode } from 'react';
 
@@ -9,11 +21,24 @@ export type AppShellNavigationItem = {
   label: string;
 };
 
+export type AppShellAiAction = {
+  href: string;
+  icon: 'sales' | 'inventory';
+  id: string;
+  label: string;
+  description: string;
+};
+
 const icons: Record<AppShellNavigationItem['icon'], LucideIcon> = {
   home: House,
   sales: ReceiptText,
   inventory: Boxes,
   settings: Settings,
+};
+
+const aiActionIcons: Record<AppShellAiAction['icon'], LucideIcon> = {
+  sales: ReceiptText,
+  inventory: Boxes,
 };
 
 const defaultNavigation: AppShellNavigationItem[] = [
@@ -33,6 +58,7 @@ type AppShellProps = {
   onSignOut?: () => void;
   activeNav?: string;
   recordSaleHref?: string;
+  aiActions?: AppShellAiAction[];
 };
 
 export function AppShell({
@@ -45,8 +71,10 @@ export function AppShell({
   onSignOut,
   activeNav = 'home',
   recordSaleHref,
+  aiActions = [],
 }: AppShellProps) {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<'ai' | 'more' | null>(null);
   const initials = userName
     .split(' ')
     .map((part) => part[0])
@@ -55,6 +83,7 @@ export function AppShell({
     .toUpperCase();
 
   function handleNavigate(event: MouseEvent<HTMLAnchorElement>, href: string) {
+    setMobilePanel(null);
     if (!onNavigate) return;
     event.preventDefault();
     onNavigate(href);
@@ -169,9 +198,8 @@ export function AppShell({
       <nav
         className="sd-bottom-nav"
         aria-label="Mobile navigation"
-        style={{ gridTemplateColumns: `repeat(${Math.max(navigation.length, 1)}, minmax(0, 1fr))` }}
       >
-        {navigation.slice(0, 4).map(({ id, label, icon, href }) => {
+        {navigation.slice(0, 3).map(({ id, label, icon, href }) => {
           const Icon = icons[icon];
           return (
             <a
@@ -186,7 +214,112 @@ export function AppShell({
             </a>
           );
         })}
+        <button
+          className="sd-bottom-nav__ai"
+          type="button"
+          aria-label="Open AI voice assistant"
+          aria-haspopup="dialog"
+          aria-expanded={mobilePanel === 'ai'}
+          onClick={() => setMobilePanel((panel) => (panel === 'ai' ? null : 'ai'))}
+        >
+          <span aria-hidden="true">
+            <Sparkles size={24} />
+            <Mic size={17} />
+          </span>
+          <small>AI voice</small>
+        </button>
+        <button
+          className="sd-bottom-nav__item sd-bottom-nav__more"
+          type="button"
+          aria-label="Open more navigation"
+          aria-haspopup="dialog"
+          aria-expanded={mobilePanel === 'more'}
+          onClick={() => setMobilePanel((panel) => (panel === 'more' ? null : 'more'))}
+        >
+          <MoreHorizontal aria-hidden="true" size={23} />
+          <span>More</span>
+        </button>
       </nav>
+      {mobilePanel && (
+        <div className="sd-mobile-panel" role="dialog" aria-modal="true">
+          <button
+            className="sd-mobile-panel__backdrop"
+            type="button"
+            aria-label="Close menu"
+            onClick={() => setMobilePanel(null)}
+          />
+          <section className="sd-mobile-panel__sheet" aria-labelledby="mobile-panel-title">
+            <div className="sd-mobile-panel__heading">
+              <div>
+                <p>{mobilePanel === 'ai' ? 'TRADA AI' : 'WORKSPACE'}</p>
+                <h2 id="mobile-panel-title">
+                  {mobilePanel === 'ai' ? 'What would you like to capture?' : 'More options'}
+                </h2>
+              </div>
+              <button
+                type="button"
+                aria-label="Close menu"
+                onClick={() => setMobilePanel(null)}
+              >
+                <X aria-hidden="true" size={20} />
+              </button>
+            </div>
+            {mobilePanel === 'ai' ? (
+              <>
+                <p className="sd-mobile-panel__intro">
+                  Voice results are drafts. You review and confirm every sale or product yourself.
+                </p>
+                <div className="sd-ai-actions">
+                  {aiActions.map((action) => {
+                    const Icon = aiActionIcons[action.icon];
+                    return (
+                      <a
+                        href={action.href}
+                        key={action.id}
+                        onClick={(event) => handleNavigate(event, action.href)}
+                      >
+                        <span className="sd-ai-actions__icon">
+                          <Icon aria-hidden="true" size={20} />
+                        </span>
+                        <span>
+                          <strong>{action.label}</strong>
+                          <small>{action.description}</small>
+                        </span>
+                        <Plus aria-hidden="true" size={18} />
+                      </a>
+                    );
+                  })}
+                  {aiActions.length === 0 && (
+                    <p className="sd-mobile-panel__empty">AI voice actions are unavailable for this role.</p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="sd-mobile-more-actions">
+                {navigation.slice(3).map(({ id, label, icon, href }) => {
+                  const Icon = icons[icon];
+                  return (
+                    <a href={href} key={id} onClick={(event) => handleNavigate(event, href)}>
+                      <Icon aria-hidden="true" size={20} />
+                      <span>{label}</span>
+                    </a>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobilePanel(null);
+                    setAccountMenuOpen(true);
+                  }}
+                >
+                  <CircleUserRound aria-hidden="true" size={20} />
+                  <span>Account</span>
+                </button>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }

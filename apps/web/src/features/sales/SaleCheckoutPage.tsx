@@ -11,7 +11,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { formatNaira } from '../../lib/formatters';
 import { readApiError } from '../../lib/apiError';
 import {
@@ -31,9 +31,12 @@ type VoiceRecordingPreview = {
   mimeType: string;
   url: string;
 };
+const maxAudioBytes = 10 * 1024 * 1024;
+const maxAudioDurationSeconds = 60;
 
 export function SaleCheckoutPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const {
     data: productsData,
     isLoading: isLoadingProducts,
@@ -70,6 +73,8 @@ export function SaleCheckoutPage() {
   const recordedAudioChunksRef = useRef<Blob[]>([]);
   const recordingStartedAtRef = useRef<number | null>(null);
   const audioPreviewUrlRef = useRef<string | null>(null);
+  const saleIdempotencyKeyRef = useRef<string | undefined>(undefined);
+  const voiceEntryRef = useRef<HTMLElement | null>(null);
 
   useEffect(
     () => () => {
@@ -93,6 +98,15 @@ export function SaleCheckoutPage() {
     return () => window.clearInterval(timer);
   }, [isRecordingVoice]);
 
+  useEffect(() => {
+    if (searchParams.get('ai') !== 'voice') return;
+    const frame = window.requestAnimationFrame(() => {
+      voiceEntryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      voiceEntryRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [searchParams]);
+
   const subtotal = useMemo(
     () =>
       items.reduce(
@@ -103,7 +117,8 @@ export function SaleCheckoutPage() {
   );
   const totalAmount = Math.max(0, subtotal - discountAmount + taxAmount);
   const balanceDue = Math.max(0, totalAmount - amountPaid);
-  const draftItems = voiceDraft?.sale?.items ?? voiceDraft?.extractedFields?.items ?? [];
+  const draftItems =
+    voiceDraft?.draft?.items ?? voiceDraft?.sale?.items ?? voiceDraft?.extractedFields?.items ?? [];
   const draftItemsMissingCheckoutData = draftItems.filter(
     (item) =>
       !item.productId ||
@@ -113,11 +128,15 @@ export function SaleCheckoutPage() {
       item.unitPrice < 0 ||
       !productsData?.products.some((product) => product.id === item.productId),
   );
+  const draftNeedsManualReview =
+    Boolean(voiceDraft?.ambiguousFields?.length) ||
+    voiceDraft?.confidence?.overall != null && voiceDraft.confidence.overall < 0.85;
   const canApplyVoiceDraft =
     Boolean(voiceDraft) &&
     items.length === 0 &&
     draftItems.length > 0 &&
-    draftItemsMissingCheckoutData.length === 0;
+    draftItemsMissingCheckoutData.length === 0 &&
+    !draftNeedsManualReview;
 
   function addProduct() {
     const product = productsData?.products.find((candidate) => candidate.id === selectedProductId);
@@ -237,6 +256,14 @@ export function SaleCheckoutPage() {
 
   function prepareAudioVoiceDraft() {
     if (!audioPreview) return;
+    if (audioPreview.durationSeconds > maxAudioDurationSeconds) {
+      setVoiceError('Keep voice recordings to 60 seconds or less, then try again.');
+      return;
+    }
+    if (audioPreview.blob.size > maxAudioBytes) {
+      setVoiceError('Keep voice recordings to 10 MB or less, then try again.');
+      return;
+    }
     void recordingToDataUrl(audioPreview.blob).then((audio) =>
       generateVoiceDraft({ audio, mimeType: audioPreview.mimeType }),
     );
@@ -254,7 +281,7 @@ export function SaleCheckoutPage() {
   function applyVoiceDraft() {
     if (!voiceDraft || !productsData || !canApplyVoiceDraft) return;
 
-    const sale = voiceDraft.sale;
+    const sale = voiceDraft.draft ?? voiceDraft.sale;
     const extracted = voiceDraft.extractedFields;
     const draftedItems: CartItem[] = draftItems.flatMap((item) => {
       const product = productsData.products.find((candidate) => candidate.id === item.productId);
@@ -278,6 +305,7 @@ export function SaleCheckoutPage() {
     setDiscountAmount(sale?.discountAmount ?? extracted?.discountAmount ?? 0);
     setTaxAmount(sale?.taxAmount ?? extracted?.taxAmount ?? 0);
     setNotes(sale?.notes ?? '');
+    saleIdempotencyKeyRef.current = voiceDraft.draft?.idempotencyKey;
     setVoiceDraft(undefined);
     setVoiceError(undefined);
   }
@@ -304,7 +332,14 @@ export function SaleCheckoutPage() {
     }
 
     try {
+      const idempotencyKey =
+        saleIdempotencyKeyRef.current ??
+        (typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `sale-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      saleIdempotencyKeyRef.current = idempotencyKey;
       const sale = await createSale({
+        idempotencyKey,
         customerName: customerName.trim() || undefined,
         customerPhone: customerPhone.trim() || undefined,
         customerEmail: customerEmail.trim() || undefined,
@@ -320,6 +355,7 @@ export function SaleCheckoutPage() {
           discountAmount: item.discountAmount,
         })),
       }).unwrap();
+      saleIdempotencyKeyRef.current = undefined;
       navigate(`/sales/${sale.id}`, { replace: true });
     } catch (reason) {
       setError(
@@ -341,7 +377,13 @@ export function SaleCheckoutPage() {
       <form className="checkout-layout" onSubmit={handleSubmit}>
         <div className="checkout-main">
           {error && <Alert tone="error">{error}</Alert>}
-          <Surface className="checkout-section voice-draft-entry">
+          <section
+            className="voice-entry-target"
+            ref={voiceEntryRef}
+            tabIndex={-1}
+            aria-label="AI voice sale capture"
+          >
+            <Surface className="checkout-section voice-draft-entry">
             <div className="form-section-heading">
               <h2>Record sale by voice</h2>
               <p>
@@ -425,7 +467,8 @@ export function SaleCheckoutPage() {
               </Button>
             </details>
             {voiceError && <Alert tone="warning">{voiceError}</Alert>}
-          </Surface>
+            </Surface>
+          </section>
 
           {voiceDraft && (
             <Surface className="checkout-section voice-draft-review" aria-live="polite">
@@ -441,6 +484,17 @@ export function SaleCheckoutPage() {
                 <span>Transcript</span>
                 <p>{voiceDraft.transcript}</p>
               </div>
+              {voiceDraft.confidence?.overall != null && voiceDraft.confidence.overall < 0.85 && (
+                <Alert tone="warning">
+                  AI confidence is {Math.round(voiceDraft.confidence.overall * 100)}%. Check every
+                  detail before using this draft.
+                </Alert>
+              )}
+              {voiceDraft.ambiguousFields?.length ? (
+                <Alert tone="warning">
+                  Needs your confirmation: {voiceDraft.ambiguousFields.join(', ')}.
+                </Alert>
+              ) : null}
               {draftItems.length > 0 ? (
                 <ul className="voice-draft-review__items" aria-label="AI-drafted sale items">
                   {draftItems.map((item, index) => (
@@ -452,6 +506,12 @@ export function SaleCheckoutPage() {
                           ? 'price needed'
                           : formatNaira.format(item.unitPrice)}
                       </span>
+                      {item.candidateMatches?.length ? (
+                        <small>
+                          Alternatives: {item.candidateMatches.map((candidate) => candidate.productName).join(', ')}.
+                          Review these against the recognised primary product before continuing.
+                        </small>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -464,6 +524,12 @@ export function SaleCheckoutPage() {
                 <Alert tone="warning">
                   Some draft items are missing a product match, quantity or price in your current
                   catalog. Add or correct them manually.
+                </Alert>
+              )}
+              {draftNeedsManualReview && (
+                <Alert tone="warning">
+                  This draft needs manual checkout review before it can be recorded. Add the
+                  verified items below instead of applying the draft automatically.
                 </Alert>
               )}
               {items.length > 0 && (

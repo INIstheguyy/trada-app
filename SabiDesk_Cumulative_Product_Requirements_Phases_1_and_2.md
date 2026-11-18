@@ -2,7 +2,7 @@
 
 **Coverage:** Phase One and Phase Two, with explicitly separated future vision  
 **Document type:** Product requirements context and business/product analysis — **not a technical requirements specification**  
-**Version:** 1.1 | **Prepared:** 3 November 2026 | **Implementation status updated:** 13 November 2026  
+**Version:** 1.1 | **Prepared:** 3 November 2026 | **Implementation status updated:** 17 November 2026
 **Intended use:** Source context for a separate technical requirements, design system, UX, and engineering planning exercise.
 
 > **Important:** This compilation consolidates the decisions, product directions, concepts and suggestions developed in the Trada conversations. A feature being discussed does not mean it has been approved, built, or committed to Phase One. The Phase One/Phase Two split below is a **recommended consolidation** of our evolving scope, not a formally signed-off release contract. This distinction matters because previous conversations used terms such as MVP, V2, “next,” and “later” at different times.
@@ -772,7 +772,7 @@ At the end of every substantive delivery session, the team should update:
 
 ## 36. Current implementation status
 
-### 36.1 Frontend status as of 13 November 2026
+### 36.1 Frontend status as of 17 November 2026
 
 | Capability                        | Status                           | Current evidence / limitation                                                                                                                                                                                                                                                                                                            |
 | --------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -782,6 +782,7 @@ At the end of every substantive delivery session, the team should update:
 | Design tokens and primitives      | **Implemented and verified**     | Semantic colour tokens updated to Trada.com.ng brand palette (dark navy `#0d1b4b`, brand green `#1a9e36`); Button, Badge and Surface primitives unchanged.                                                                                                                                                                               |
 | Responsive application shell      | **Implemented and verified**     | Mobile bottom navigation, tablet rail and desktop sidebar. Brand mark updated from "S" to "T".                                                                                                                                                                                                                                           |
 | PWA shell                         | **Implemented and verified**     | Production build generates the manifest and service worker; online-first transactional behavior remains the product rule.                                                                                                                                                                                                                |
+| Reference-led merchant composition | **Implemented and verified**     | Dashboard, Sales and Inventory now use the shared rounded KPI/action/card language across responsive breakpoints. Current records and qualified/unavailable values are retained; charts, valuation, movements and other unsupported screenshot features remain absent.                                                                                                      |
 | Data and validation foundation    | **Implemented and verified**     | Redux Toolkit, RTK Query and Zod contract validation are configured.                                                                                                                                                                                                                                                                     |
 | Owner Command Centre              | **Implemented and verified**     | The dashboard composes documented sales analytics, low-stock and recent-sales endpoints. The obsolete fixture endpoint has been removed. Live backend testing was intentionally deferred.                                                                                                                                                |
 | Financial-truth presentation      | **Implemented and verified**     | Revenue, cash received, gross profit and unpaid balances remain distinct. Unsupported cash totals are unavailable; profit and unpaid balances are explicitly qualified where the backend contract is incomplete.                                                                                                                         |
@@ -793,7 +794,7 @@ At the end of every substantive delivery session, the team should update:
 | Products and low-stock alerts     | **Implemented and verified**     | Searchable/paginated list, low-stock summary, create, detail/edit and guarded delete routes are implemented against the documented contract. Live backend testing was intentionally deferred.                                                                                                                                            |
 | Sales and sales analytics         | **Implemented and verified**     | Protected checkout, filtered/paginated history, detail, guarded cancellation/restock and analytics are implemented against the documented contract. Revenue, received amount and balance due remain distinct. Live backend testing was intentionally deferred.                                                                           |
 | Full production RBAC              | **Blocked by decision/contract** | Backend documentation exposes a generic `user` role but no staff membership, permission, branch, approval or authorization-denied contract.                                                                                                                                                                                              |
-| AI capture and draft review       | **Planned**                      | No backend AI job, draft, confidence, review or confirmation contract is documented yet.                                                                                                                                                                                                                                                 |
+| AI capture and draft review       | **Partially defined**            | The mobile centre launcher routes permitted users to draft-only voice sale or product creation with explicit merchant review; product-update suggestions remain non-applying previews. The image endpoint is exposed only as an acknowledged contract test because it writes immediately. Unified AI, confidence, idempotency, safe image drafts, inventory authorization/audit and production release gates remain unresolved.            |
 | Expenses, purchases and suppliers | **Planned**                      | Required by the PRD but not present in the received backend contract.                                                                                                                                                                                                                                                                    |
 | Storefront and marketing          | **Planned**                      | Required direction, but no received backend contract yet.                                                                                                                                                                                                                                                                                |
 
@@ -1680,3 +1681,191 @@ These items require clarification before the frontend treats the backend as the 
 **Verification:** Focused API-contract and checkout coverage passed: 13 tests across 2 files. Web typecheck and diff hygiene passed.
 
 **Known release gate:** A 413 response was observed for an approximately 137 KB JSON base64 audio request. Backend/DevOps must confirm and document the effective application/proxy/gateway body limit. The next frontend hardening pass should add a tested recording duration and encoded-payload-size guard based on that confirmed limit.
+
+### Session 027 — Draft-only voice product creation
+
+**Date:** 17 November 2026
+**Outcome:** Voice-assisted creation is now available on the new-product form as a draft-only workflow. It shares the same merchant review and explicit-persistence safeguards as voice sales.
+
+**Completed:**
+
+- Added `POST /products/from-voice` with explicit `save: false` and `action: create` to the typed API layer.
+- Added a tolerant product-draft schema for backend `product` and `extractedFields` result variants, including numeric normalization.
+- Added microphone recording, elapsed time, temporary replay/discard and typed fallback to the new-product form only.
+- Applied AI output solely as editable form defaults. The existing `POST /products` Save product action remains the only creation request.
+- Kept voice-assisted editing/restocking out of scope: stock-changing suggestions require the outstanding inventory movement and audit contract.
+
+**Verification:** Focused product-form and API-contract coverage passed: 12 tests across 2 files. Web typecheck and diff hygiene passed.
+
+### Session 030 — Production product-list compatibility fix
+
+**Date:** 17 November 2026
+**Outcome:** Restored the product list when a production API response includes a nullable `stockThreshold`.
+
+**Issue:** `GET /products` returned a successful cached response (`304 Not Modified`) with valid product records, but the product created by the image endpoint had `stockThreshold: null`. The client schema required a number, so one malformed/nullable field rejected the entire product array and surfaced a list error.
+
+**Completed:**
+
+- Added a nullable-decimal compatibility parser that renders an absent product or low-stock threshold as `0`.
+- Added a regression fixture with a `null` threshold and a second valid product, proving the full list remains available.
+
+**Verification:** Product-list and API-contract coverage passed: 14 tests across 2 files. Web typecheck and diff hygiene passed.
+
+**Backend follow-up:** Product list and product-create responses should consistently serialize `stockThreshold` as a number. The image endpoint must map the recognized low-stock value rather than creating a record with `null`; the frontend fallback prevents a page failure but cannot recover the missing threshold intent.
+
+### Session 029 — Preview-only voice product-update suggestions
+
+**Date:** 17 November 2026
+**Outcome:** Added a non-persisting product-update suggestion workflow to the product-edit page.
+
+**Completed:**
+
+- Added `POST /products/:id/from-voice` with explicit `save: false` to the typed API layer.
+- Added a text-first proposed-change input and review result containing the transcript plus extracted quantity mode/quantity and selling-price suggestions.
+- Made the preview explicitly non-applicable: no stock, price or field is changed from the AI response.
+- Preserved the normal editable form and Save changes request as the only way to persist a product update.
+
+**Reason for boundary:** `add`, `subtract` and `set` stock operations still lack the required inventory-movement, audit, stale-record and authorization contract. Browser microphone capture is intentionally deferred for this endpoint until that contract is documented.
+
+**Verification:** Focused product-form and API-contract coverage passed: 12 tests across 2 files. Web typecheck and diff hygiene passed.
+
+**Next session target:** Add the confirmed audio duration/payload guard, then implement product-update voice suggestions as preview-only once the inventory authorization/audit behavior is documented.
+
+### Session 028 — Product-image endpoint contract test
+
+**Date:** 17 November 2026
+**Outcome:** Added an explicitly experimental UI for validating the production `POST /products/from-image` endpoint and observing its returned data shape.
+
+**Completed:**
+
+- Added base64/data-URL image submission with the required storage location.
+- Added a local image preview, mandatory acknowledgement and immediate-creation warning before the request can be sent.
+- Added a typed response parser for the returned created product and extracted fields, plus a link to inspect the created product after success.
+- The feature is isolated from the normal form submission path and makes no request until the merchant deliberately confirms the test.
+
+**Safety boundary:** This is a production-contract test only. The documented endpoint has no `save: false` mode and therefore immediately creates a product. It must not be presented as the standard product-image workflow until backend adds a draft/preview path, editable extracted fields and duplicate detection.
+
+**Verification:** Focused product-form and API-contract coverage passed: 12 tests across 2 files. Web typecheck and diff hygiene passed.
+
+### Session 031 — Three-module reference replication analysis
+
+**Date:** 17 November 2026
+**Outcome:** The three new mobile references were assessed against the current Dashboard, Sales and Inventory implementation, architecture, product requirements and received HTTP contract. A proposed visual-replication plan now separates safe reference fidelity from features that would invent data, weaken financial meaning or bypass AI/inventory safeguards.
+
+**Completed:**
+
+- Catalogued the shared reference language: mobile header, paired KPI cards, compact actions and lists, semantic status treatment and a raised five-item mobile dock.
+- Mapped every major reference element to current code and contracts, distinguishing direct visual adaptations, safe derivations, product decisions and backend-blocked behavior.
+- Defined module-specific target compositions and mobile, tablet and desktop responsive behavior.
+- Drafted a staged end-to-end process covering product disposition, shared patterns, shell work, three vertical slices, contract-backed enhancements and release hardening.
+- Added `THREE_MODULE_REFERENCE_REPLICATION_PLAN.md` as an implementation proposal. It does not approve the screenshots' sample data or depicted features as product requirements.
+- Corrected the Part H implementation date and AI capability row to reflect the already logged draft-only voice and experimental image work.
+
+**Product and contract findings:**
+
+- Current contracts do not safely provide trend percentages, a daily sales time series, inventory valuation, stock-movement totals, a complete out-of-stock view, product media, notifications, a customer debtor ledger, invoices, suppliers/purchases or storefront sharing.
+- The centre AI control can represent only capability-backed, review-first actions; it must not imply a unified assistant. The immediate-write image endpoint must not become the standard “Scan / Add with AI” action without draft/preview and duplicate-handling contracts.
+- “Profit” must remain qualified as gross profit, and “Outstanding debts” must remain an unpaid sale balance unless a customer/payment ledger is delivered.
+- A global date control is not approved: the same reference control has defined reporting behavior for Dashboard/Sales but no defined meaning for Inventory.
+- “Quick Sale,” mobile “More” and four-card symmetry with unavailable data require explicit product decisions before implementation.
+
+**Delivery and documentation risks:**
+
+- Literal screenshot replication would expose unsupported claims and could misstate financial data; implementation must follow the element dispositions in the new plan.
+- The repository instructions refer to `Trada_Cumulative_Product_Requirements_Phases_1_and_2.md` and `Trada_API_Requests_and_Responses.md`, while the actual tracked files are currently named with the `SabiDesk_` prefix. Their contents refer to Trada. Resolve this source-of-truth naming conflict through an explicit rename/migration after protecting current uncommitted edits.
+- Product images are absent from the current schema, and the supplied raster logo still needs a production transparent/vector source for faithful shell treatment.
+
+**Verification:** Read-only audit of the three supplied images, current feature components, responsive CSS, shared shell/navigation, capability registry, API schemas, architecture, PRD, backend contract and existing focused tests. No application code or runtime behavior changed; automated test execution was not required for this documentation-only plan.
+
+**Next session target:** Approve or amend the element-disposition tables and first delivery boundary, decide the centre action/More/Quick Sale behavior, then implement Stage 1 shared visual patterns before changing any module composition.
+
+### Session 032 — Reference-led Dashboard, Sales and Inventory implementation
+
+**Date:** 17 November 2026
+**Outcome:** The first contract-safe implementation of the three supplied mobile reference direction is complete. The merchant shell and Dashboard, Sales and Inventory compositions now share the new mobile visual hierarchy, while keeping existing routes, access controls, data semantics and response-validation behavior intact.
+
+**Completed:**
+
+- Reworked the mobile dock into a five-position navy surface with a visually dominant raised centre **AI voice** action and a More menu; tablet rail and desktop sidebar behavior remain intact.
+- Connected the centre action to a capability-aware voice launcher. It exposes only **Record a sale by voice** and **Add a product by voice** for permitted users, routes to the existing review-first flows and focuses the selected voice-capture section. It never starts the microphone or writes a record automatically.
+- Replaced the mobile sale FAB in the authenticated product shell with the central AI launcher. Manual Record sale remains available from the Sales module.
+- Applied the shared rounded KPI/action/card treatment to Dashboard, Sales and Inventory across the existing responsive layout.
+- Added a truthful Inventory summary: total products and low-stock count use existing data; inventory value and stock movements explicitly remain unavailable because their aggregate/valuation contracts do not exist.
+- Added a truthful Voice sale entry from Sales. It uses the existing draft-only checkout route rather than pretending that undefined Quick Sale behavior exists.
+- Added shell regression coverage for the centre launcher and its draft-only routes.
+
+**Verification:**
+
+- TypeScript type-check passed.
+- ESLint passed with zero warnings.
+- Full Vitest suite passed: 43 tests across 17 files.
+- Production PWA build passed: 34 precache entries; entry bundle 470.04 kB minified (148.49 kB gzip).
+
+**Implementation boundaries and risks:**
+
+- The centre control is a universal entry to the currently safe, focused voice flows; it is not a general `/voice` assistant because that endpoint has not yet been integrated with a complete review, confidence, idempotency and action-routing contract.
+- The browser still requires a separate user gesture before microphone permission or recording. This is intentional security and browser behavior.
+- Trend charts/percentages, notifications, inventory valuation, stock movements, product imagery, debtors, storefront actions and photo-based standard product capture remain absent or gated as recorded in Session 031.
+- Manual visual and assistive-technology inspection at 360, 390, 768, 1024, 1200 and 1440 px remains required; automated component checks cannot substitute for this review.
+
+**Next session target:** Perform the cross-breakpoint visual/keyboard review, then refine spacing and density from that evidence before considering any contract-blocked reference capability.
+
+### Session 033 — AI draft-and-review contract v2 review
+
+**Date:** 17 November 2026
+**Outcome:** Reviewed the backend's v2 AI contract. It formalizes the review-first safeguards required by the PRD and supersedes the earlier immediate-write image assumption.
+
+**Confirmed backend improvements:**
+
+- All AI routes now default to `save: false`; draft requests guarantee no record, ID, receipt number or stock change.
+- Draft responses provide `isDraft: true` and a `data.draft` payload intended to be submitted, after merchant edits, to the standard sale/product write API.
+- Sales drafts now include hydrated totals, payment values, product-match confidence/candidates, ambiguity metadata and a top-level confidence result.
+- Product-update drafts now provide an explicit stock-movement diff and concurrent-record timestamp; product-image extraction now supports draft/preview rather than immediate creation.
+- Write routes support idempotency keys, sensitive user fields are excluded from responses, decimals are native JSON numbers, and production limits are documented: 50 MB request maximum, recommended audio <= 10 MB / 60 seconds, images <= 5 MB, and frontend timeout 45 seconds.
+
+**Required frontend adaptations:**
+
+- Replace legacy `sale`/`product`/`extractedFields`-first parsing and mapping with the canonical `data.draft` model while retaining transitional compatibility until production confirms the new response shape.
+- Submit an idempotency key with every confirmed `POST /sales` request and propagate the returned key in draft confirmation; add the documented 45-second AI-request timeout.
+- Enforce the published client-side media limits before data-URL conversion/upload and expose duration/size feedback.
+- Render confidence, ambiguity warnings and candidate-product selection in the sale review. Require an explicit merchant selection for ambiguous or low-confidence matches.
+- Replace the experimental, immediate-create image test with a preview that pre-fills the normal editable product form; only its regular Save product action may persist.
+- Upgrade product-update review to display the current-to-proposed stock diff and apply only the reviewed `draft` through the normal PATCH flow, retaining current stale-record/permission safeguards.
+
+**Release gate:** Validate each new response against production with a non-sensitive test business before removing compatibility handling or enabling the unified `/voice` entry point. The documented confirmation table still needs an explicit standard-product-write idempotency statement if product creation must be retry-safe.
+
+### Session 034 — AI contract v2 frontend adaptation
+
+**Date:** 17 November 2026
+**Outcome:** Adapted the currently delivered AI surfaces to the v2 draft-and-review contract without enabling automatic AI persistence.
+
+**Completed:**
+
+- Extended typed AI response parsing for `isDraft`, canonical `draft` payloads, confidence, ambiguity, candidate matches and product-update stock-movement data; retained legacy response compatibility during the backend rollout.
+- Added the documented 45-second request timeout and an `Idempotency-Key` header for confirmed sales. A reviewed sale draft preserves its supplied key; a manual sale receives a client-generated key and retains it for a retry after a failed response.
+- Enforced client-side audio limits before base64 conversion/upload: 60 seconds and 10 MB. Product-image selection now rejects files above 5 MB.
+- Replaced the experimental immediate-create image test with `save: false` draft preparation. The merchant can apply extracted fields to the existing editable product form; the normal Save product action remains the only product creation request.
+- Updated sale review to consume canonical draft fields, show confidence/ambiguity and candidate-product warnings, and prevent automatic cart application where the response needs manual merchant verification.
+- Updated product voice creation to prefer canonical draft fields and product-update review to show the returned current/delta/resulting stock summary.
+
+**Verification:** Web typecheck passed. Full Vitest suite passed: 45 tests across 17 files, including new v2 voice-sale and image-draft API-contract fixtures.
+
+**Outstanding backend decisions:** The contract does not yet state whether review metadata in `data.draft` is accepted by `POST /sales`, and it does not define how `stockMovement.currentUpdatedAt` must be submitted to PATCH or how a stale write is reported. The frontend deliberately keeps those paths under manual review pending that response.
+
+**Next session target:** Live-smoke-test v2 draft responses with a non-sensitive test business, then add selectable candidate matching and a product-update confirm path only when the remaining payload and optimistic-concurrency semantics are specified.
+
+### Session 035 — Candidate-match correction and protected voice product update
+
+**Date:** 18 November 2026
+**Outcome:** Incorporated the backend’s product-update concurrency contract and corrected the meaning of candidate product matches in the sale review.
+
+**Completed:**
+
+- Candidate matches are now presented as recognition-comparison evidence for the primary voice-to-product match. They no longer block checkout application by themselves; explicit ambiguous fields or low overall confidence still require manual checkout review.
+- Added `currentUpdatedAt` to the typed product PATCH payload and submit the draft’s `stockMovement.currentUpdatedAt` when a merchant applies a reviewed voice update.
+- Enabled a deliberate **Apply reviewed update** action only where the backend returned both a product-update `draft` and a stock-movement snapshot.
+- Added a 409 `CONCURRENT_MODIFICATION` resolution state showing the live stock and selling price, with options to recalculate the voice draft or explicitly overwrite using the supplied fresh server timestamp.
+
+**Verification:** Web typecheck and lint passed. The relevant business-route tests passed in isolation after the full parallel suite experienced unrelated 5-second timing failures; a serialized full-suite run exceeded the local command time limit. The AI contract suite remains green.
+
+**Boundary:** Candidate matches are useful evidence, not proof that the first product is correct. The merchant remains responsible for reviewing the recognised primary product and the resulting sale or inventory change.

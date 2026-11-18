@@ -42,3 +42,38 @@ test('opens an account menu before signing out', () => {
   fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
   expect(onSignOut).toHaveBeenCalledOnce();
 });
+
+test('opens the central AI voice launcher and routes only to draft-safe workflows', () => {
+  const onNavigate = vi.fn();
+  render(
+    <AppShell
+      navigation={getMerchantNavigation('user')}
+      onNavigate={onNavigate}
+      aiActions={[
+        {
+          id: 'voice-sale',
+          label: 'Record a sale by voice',
+          description: 'Review a sale draft before recording it.',
+          href: '/sales/new?ai=voice',
+          icon: 'sales',
+        },
+        {
+          id: 'voice-product',
+          label: 'Add a product by voice',
+          description: 'Review a product draft before saving it.',
+          href: '/products/new?ai=voice',
+          icon: 'inventory',
+        },
+      ]}
+    >
+      <p>Workspace</p>
+    </AppShell>,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Open AI voice assistant' }));
+  expect(screen.getByRole('dialog')).toHaveTextContent('What would you like to capture?');
+  expect(screen.getByText('Voice results are drafts. You review and confirm every sale or product yourself.')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('link', { name: /Record a sale by voice/ }));
+  expect(onNavigate).toHaveBeenCalledWith('/sales/new?ai=voice');
+});

@@ -9,17 +9,33 @@ import {
   Surface,
   Textarea,
 } from '@trada/ui';
-import { AlertTriangle, ArrowLeft, Boxes, PackageCheck, Trash2 } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Boxes,
+  FilePenLine,
+  Mic,
+  PackageCheck,
+  Square,
+  Trash2,
+} from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useAppSelector } from '../../app/hooks';
 import { can, normalizeRole } from '../../app/permissions';
 import {
   useCreateProductMutation,
+  useCreateProductFromImageMutation,
+  useCreateVoiceProductDraftMutation,
+  useCreateVoiceProductUpdateDraftMutation,
   useDeleteProductMutation,
   useGetProductQuery,
   useUpdateProductMutation,
   type ProductInput,
+  type ImageProductResult,
+  type VoiceProductDraft,
+  type VoiceProductDraftRequest,
+  type ProductUpdateInput,
 } from '../../lib/api';
 import { readApiError } from '../../lib/apiError';
 
@@ -41,10 +57,57 @@ const emptyProduct: ProductInput = {
   isActive: true,
 };
 
+type VoiceRecordingPreview = { blob: Blob; durationSeconds: number; mimeType: string; url: string };
+type ProductUpdateConflict = {
+  serverCurrentUpdatedAt: string;
+  currentProduct: { id: string; name: string; quantity: number; sellingPrice: number };
+};
+const maxAudioBytes = 10 * 1024 * 1024;
+const maxAudioDurationSeconds = 60;
+const maxImageBytes = 5 * 1024 * 1024;
+
+function productUpdateConflictFrom(reason: unknown): ProductUpdateConflict | undefined {
+  if (typeof reason !== 'object' || reason === null) return undefined;
+  const response = reason as { status?: unknown; data?: unknown };
+  if (response.status !== 409 || typeof response.data !== 'object' || response.data === null)
+    return undefined;
+  const data = response.data as {
+    error?: unknown;
+    data?: { conflictDetails?: { serverCurrentUpdatedAt?: unknown; currentProduct?: unknown } };
+  };
+  const details = data.data?.conflictDetails;
+  const current = details?.currentProduct;
+  if (
+    data.error !== 'CONCURRENT_MODIFICATION' ||
+    typeof details?.serverCurrentUpdatedAt !== 'string' ||
+    typeof current !== 'object' ||
+    current === null
+  )
+    return undefined;
+  const product = current as Record<string, unknown>;
+  if (
+    typeof product.id !== 'string' ||
+    typeof product.name !== 'string' ||
+    typeof product.quantity !== 'number' ||
+    typeof product.sellingPrice !== 'number'
+  )
+    return undefined;
+  return {
+    serverCurrentUpdatedAt: details.serverCurrentUpdatedAt,
+    currentProduct: {
+      id: product.id,
+      name: product.name,
+      quantity: product.quantity,
+      sellingPrice: product.sellingPrice,
+    },
+  };
+}
+
 export function ProductFormPage() {
   const { id } = useParams();
   const isEditing = Boolean(id);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const user = useAppSelector((state) => state.auth.user);
   const role = normalizeRole(user?.role ?? 'user');
   const {
@@ -54,11 +117,35 @@ export function ProductFormPage() {
     refetch,
   } = useGetProductQuery(id ?? '', { skip: !id });
   const [createProduct, createState] = useCreateProductMutation();
+  const [createProductFromImage, imageCreateState] = useCreateProductFromImageMutation();
+  const [createVoiceProductDraft, voiceDraftState] = useCreateVoiceProductDraftMutation();
+  const [createVoiceProductUpdateDraft, voiceUpdateDraftState] =
+    useCreateVoiceProductUpdateDraftMutation();
   const [updateProduct, updateState] = useUpdateProductMutation();
   const [deleteProduct, deleteState] = useDeleteProductMutation();
   const [product, setProduct] = useState<ProductInput>(emptyProduct);
   const [error, setError] = useState<string>();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [voiceText, setVoiceText] = useState('');
+  const [voiceDraft, setVoiceDraft] = useState<VoiceProductDraft>();
+  const [voiceError, setVoiceError] = useState<string>();
+  const [voiceUpdateText, setVoiceUpdateText] = useState('');
+  const [voiceUpdateDraft, setVoiceUpdateDraft] = useState<VoiceProductDraft>();
+  const [voiceUpdateError, setVoiceUpdateError] = useState<string>();
+  const [voiceUpdateConflict, setVoiceUpdateConflict] = useState<ProductUpdateConflict>();
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [recordingElapsedSeconds, setRecordingElapsedSeconds] = useState(0);
+  const [audioPreview, setAudioPreview] = useState<VoiceRecordingPreview>();
+  const [imageFile, setImageFile] = useState<File>();
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string>();
+  const [imageError, setImageError] = useState<string>();
+  const [imageResult, setImageResult] = useState<ImageProductResult>();
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
+  const recordingStartedAtRef = useRef<number | null>(null);
+  const audioPreviewUrlRef = useRef<string | null>(null);
+  const voiceEntryRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (existing) {
@@ -81,6 +168,305 @@ export function ProductFormPage() {
       });
     }
   }, [existing]);
+
+  useEffect(
+    () => () => {
+      mediaRecorderRef.current?.stop();
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      if (audioPreviewUrlRef.current) URL.revokeObjectURL(audioPreviewUrlRef.current);
+      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    },
+    [imagePreviewUrl],
+  );
+
+  useEffect(() => {
+    if (!isRecordingVoice) return;
+    const timer = window.setInterval(() => {
+      setRecordingElapsedSeconds(
+        Math.max(
+          0,
+          Math.floor((Date.now() - (recordingStartedAtRef.current ?? Date.now())) / 1000),
+        ),
+      );
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [isRecordingVoice]);
+
+  useEffect(() => {
+    if (isEditing || searchParams.get('ai') !== 'voice') return;
+    const frame = window.requestAnimationFrame(() => {
+      voiceEntryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      voiceEntryRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isEditing, searchParams]);
+
+  async function generateVoiceDraft(input: VoiceProductDraftRequest) {
+    setVoiceError(undefined);
+    setVoiceDraft(undefined);
+    try {
+      const draft = await createVoiceProductDraft(input).unwrap();
+      setVoiceDraft(draft);
+    } catch (reason) {
+      setVoiceError(
+        readApiError(reason, 'We couldnâ€™t prepare a product draft. Complete the form manually.'),
+      );
+    }
+  }
+
+  function discardAudioPreview() {
+    if (audioPreviewUrlRef.current) URL.revokeObjectURL(audioPreviewUrlRef.current);
+    audioPreviewUrlRef.current = null;
+    setAudioPreview(undefined);
+  }
+
+  async function startVoiceRecording() {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setVoiceError(
+        'Voice recording requires HTTPS on another device. Type the product description instead.',
+      );
+      return;
+    }
+    setVoiceError(undefined);
+    setVoiceDraft(undefined);
+    discardAudioPreview();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : 'audio/webm';
+      const recorder = new MediaRecorder(stream, { mimeType });
+      recordingChunksRef.current = [];
+      recordingStartedAtRef.current = Date.now();
+      setRecordingElapsedSeconds(0);
+      mediaStreamRef.current = stream;
+      mediaRecorderRef.current = recorder;
+      recorder.addEventListener('dataavailable', (event) => {
+        if (event.data.size > 0) recordingChunksRef.current.push(event.data);
+      });
+      recorder.addEventListener('stop', () => {
+        const recording = new Blob(recordingChunksRef.current, {
+          type: recorder.mimeType || mimeType,
+        });
+        mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+        mediaRecorderRef.current = null;
+        setIsRecordingVoice(false);
+        const durationSeconds = Math.max(
+          1,
+          Math.round((Date.now() - (recordingStartedAtRef.current ?? Date.now())) / 1000),
+        );
+        setRecordingElapsedSeconds(durationSeconds);
+        if (recording.size === 0) {
+          setVoiceError(
+            'No audio was captured. Try recording again or type the product description instead.',
+          );
+          return;
+        }
+        const url = URL.createObjectURL(recording);
+        audioPreviewUrlRef.current = url;
+        setAudioPreview({
+          blob: recording,
+          durationSeconds,
+          mimeType: recording.type || 'audio/webm',
+          url,
+        });
+      });
+      recorder.start();
+      setIsRecordingVoice(true);
+    } catch {
+      setVoiceError(
+        'We could not access your microphone. Allow microphone access or type the product description instead.',
+      );
+    }
+  }
+
+  function stopVoiceRecording() {
+    if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
+  }
+
+  function prepareAudioVoiceDraft() {
+    if (!audioPreview) return;
+    if (audioPreview.durationSeconds > maxAudioDurationSeconds) {
+      setVoiceError('Keep voice recordings to 60 seconds or less, then try again.');
+      return;
+    }
+    if (audioPreview.blob.size > maxAudioBytes) {
+      setVoiceError('Keep voice recordings to 10 MB or less, then try again.');
+      return;
+    }
+    void recordingToDataUrl(audioPreview.blob).then((audio) =>
+      generateVoiceDraft({ audio, mimeType: audioPreview.mimeType }),
+    );
+  }
+
+  function prepareTypedVoiceDraft() {
+    const text = voiceText.trim();
+    if (!text) {
+      setVoiceError('Enter a product description to prepare a typed draft.');
+      return;
+    }
+    void generateVoiceDraft({ text });
+  }
+
+  function applyVoiceDraft() {
+    if (!voiceDraft) return;
+    const fields = voiceDraft.draft ?? voiceDraft.extractedFields ?? voiceDraft.product;
+    if (!fields) return;
+    setProduct((current) => ({
+      ...current,
+      name: fields.name ?? current.name,
+      description: fields.description ?? current.description,
+      type: fields.type ?? current.type,
+      category: fields.category ?? current.category,
+      unit: fields.unit ?? current.unit,
+      quantity: fields.quantity ?? current.quantity,
+      stockThreshold: fields.stockThreshold ?? current.stockThreshold,
+      costPrice: fields.costPrice ?? current.costPrice,
+      sellingPrice: fields.sellingPrice ?? current.sellingPrice,
+      discountPrice: fields.discountPrice ?? current.discountPrice,
+      condition: fields.condition ?? current.condition,
+      location: fields.location ?? current.location,
+      sku: fields.sku ?? current.sku,
+      barcode: fields.barcode ?? current.barcode,
+      isActive: fields.isActive ?? current.isActive,
+    }));
+    setVoiceDraft(undefined);
+    setVoiceError(undefined);
+  }
+
+  async function prepareVoiceUpdateSuggestion() {
+    if (!id) return;
+    const text = voiceUpdateText.trim();
+    if (!text) {
+      setVoiceUpdateError('Describe the proposed change first.');
+      return;
+    }
+    setVoiceUpdateError(undefined);
+    setVoiceUpdateDraft(undefined);
+    setVoiceUpdateConflict(undefined);
+    try {
+      const draft = await createVoiceProductUpdateDraft({ id, text }).unwrap();
+      setVoiceUpdateDraft(draft);
+    } catch (reason) {
+      setVoiceUpdateError(
+        readApiError(
+          reason,
+          'We couldnâ€™t prepare an update suggestion. Update this product manually.',
+        ),
+      );
+    }
+  }
+
+  async function applyVoiceUpdate(expectedUpdatedAt?: string) {
+    if (!id || !voiceUpdateDraft?.draft || !voiceUpdateDraft.stockMovement) return;
+    const fields = voiceUpdateDraft.draft;
+    const changes = Object.fromEntries(
+      Object.entries({
+        name: fields.name,
+        description: fields.description,
+        type: fields.type,
+        category: fields.category,
+        unit: fields.unit,
+        quantity: fields.quantity,
+        stockThreshold: fields.stockThreshold,
+        costPrice: fields.costPrice,
+        sellingPrice: fields.sellingPrice,
+        discountPrice: fields.discountPrice,
+        condition: fields.condition,
+        location: fields.location,
+        sku: fields.sku,
+        barcode: fields.barcode,
+        isActive: fields.isActive,
+        currentUpdatedAt: expectedUpdatedAt ?? voiceUpdateDraft.stockMovement.currentUpdatedAt,
+      }).filter(([, value]) => value !== undefined),
+    ) as ProductUpdateInput;
+    if (Object.keys(changes).length <= 1) return;
+
+    setVoiceUpdateError(undefined);
+    setVoiceUpdateConflict(undefined);
+    try {
+      await updateProduct({ id, changes }).unwrap();
+      setProduct((current) => ({ ...current, ...changes }));
+      setVoiceUpdateDraft(undefined);
+      await refetch();
+    } catch (reason) {
+      const conflict = productUpdateConflictFrom(reason);
+      if (conflict) {
+        setVoiceUpdateConflict(conflict);
+        return;
+      }
+      setVoiceUpdateError(
+        readApiError(reason, 'We couldnâ€™t apply this reviewed update. Try again or edit manually.'),
+      );
+    }
+  }
+
+  function selectImage(file?: File) {
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setImageResult(undefined);
+    setImageError(undefined);
+    if (file && file.size > maxImageBytes) {
+      setImageFile(undefined);
+      setImagePreviewUrl(undefined);
+      setImageError('Choose an image that is 5 MB or smaller.');
+      return;
+    }
+    setImageFile(file);
+    setImagePreviewUrl(file ? URL.createObjectURL(file) : undefined);
+  }
+
+  async function prepareImageProductDraft() {
+    if (!imageFile) {
+      setImageError('Choose a product image first.');
+      return;
+    }
+    if (!product.location?.trim()) {
+      setImageError('Enter the storage location for the draft.');
+      return;
+    }
+    if (imageFile.size > maxImageBytes) {
+      setImageError('Choose an image that is 5 MB or smaller.');
+      return;
+    }
+    setImageError(undefined);
+    setImageResult(undefined);
+    try {
+      const image = await fileToDataUrl(imageFile);
+      const result = await createProductFromImage({
+        image,
+        location: product.location.trim(),
+      }).unwrap();
+      setImageResult(result);
+    } catch (reason) {
+      setImageError(readApiError(reason, 'We couldnâ€™t prepare a product draft from this image.'));
+    }
+  }
+
+  function applyImageDraft() {
+    const fields = imageResult?.draft ?? imageResult?.extractedFields;
+    if (!fields) return;
+    setProduct((current) => ({
+      ...current,
+      name: fields.name ?? current.name,
+      description: fields.description ?? current.description,
+      type: fields.type ?? current.type,
+      category: fields.category ?? current.category,
+      unit: fields.unit ?? current.unit,
+      quantity: fields.quantity ?? current.quantity,
+      stockThreshold: fields.stockThreshold ?? current.stockThreshold,
+      costPrice: fields.costPrice ?? current.costPrice,
+      sellingPrice: fields.sellingPrice ?? current.sellingPrice,
+      discountPrice: fields.discountPrice ?? current.discountPrice,
+      condition: fields.condition ?? current.condition,
+      location: fields.location ?? current.location,
+      sku: fields.sku ?? current.sku,
+      barcode: fields.barcode ?? current.barcode,
+      isActive: fields.isActive ?? current.isActive,
+    }));
+    setImageResult(undefined);
+    setImageError(undefined);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -152,6 +538,300 @@ export function ProductFormPage() {
           <Alert tone="error" icon={<AlertTriangle aria-hidden="true" size={18} />}>
             {error}
           </Alert>
+        )}
+
+        {!isEditing && (
+          <section
+            className="voice-entry-target"
+            ref={voiceEntryRef}
+            tabIndex={-1}
+            aria-label="AI voice product capture"
+          >
+            <Surface className="product-form-section voice-draft-entry">
+            <div className="form-section-heading">
+              <div>
+                <h2>Add product by voice</h2>
+                <p>Record a description, review the draft, then save this form normally.</p>
+              </div>
+            </div>
+            <div className="voice-draft-entry__actions">
+              <Button
+                type="button"
+                variant="secondary"
+                loading={voiceDraftState.isLoading && !isRecordingVoice}
+                onClick={() =>
+                  isRecordingVoice ? stopVoiceRecording() : void startVoiceRecording()
+                }
+                icon={
+                  isRecordingVoice ? (
+                    <Square aria-hidden="true" size={16} fill="currentColor" />
+                  ) : (
+                    <Mic aria-hidden="true" size={17} />
+                  )
+                }
+              >
+                {isRecordingVoice ? 'Stop recording' : 'Start voice recording'}
+              </Button>
+              <small>
+                {isRecordingVoice
+                  ? `Recording ${formatRecordingDuration(recordingElapsedSeconds)} â€” tap stop when finished.`
+                  : 'The AI only prepares a draft. It cannot create a product from this action.'}
+              </small>
+            </div>
+            {audioPreview && (
+              <div className="voice-recording-preview">
+                <div>
+                  <strong>Recording ready</strong>
+                  <span>
+                    {formatRecordingDuration(audioPreview.durationSeconds)} Â·{' '}
+                    {formatFileSize(audioPreview.blob.size)}
+                  </span>
+                </div>
+                <audio controls preload="metadata" src={audioPreview.url}>
+                  Your browser cannot play this recording.
+                </audio>
+                <div className="voice-recording-preview__actions">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    loading={voiceDraftState.isLoading}
+                    onClick={prepareAudioVoiceDraft}
+                  >
+                    Prepare audio draft
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={discardAudioPreview}>
+                    Discard recording
+                  </Button>
+                </div>
+              </div>
+            )}
+            <details className="voice-draft-entry__fallback">
+              <summary>Canâ€™t record? Type a product description instead</summary>
+              <FormField htmlFor="voice-product-text" label="Product description">
+                <Textarea
+                  id="voice-product-text"
+                  rows={3}
+                  value={voiceText}
+                  onChange={(event) => setVoiceText(event.target.value)}
+                  placeholder="For example: 30 bags of Semovita, cost 11k, sell 13.5k, in the warehouse."
+                />
+              </FormField>
+              <Button
+                type="button"
+                variant="ghost"
+                loading={voiceDraftState.isLoading}
+                onClick={prepareTypedVoiceDraft}
+                icon={<FilePenLine aria-hidden="true" size={17} />}
+              >
+                Prepare typed draft
+              </Button>
+            </details>
+            {voiceError && <Alert tone="warning">{voiceError}</Alert>}
+            {voiceDraft && (
+              <div className="voice-draft-review" aria-live="polite">
+                <Alert tone="warning">
+                  No product has been created. Review the extracted details before saving this form.
+                </Alert>
+                <div className="voice-draft-review__transcript">
+                  <span>Transcript</span>
+                  <p>{voiceDraft.transcript}</p>
+                </div>
+                <div className="voice-draft-review__actions">
+                  <Button type="button" onClick={applyVoiceDraft}>
+                    Use details in product form
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setVoiceDraft(undefined)}>
+                    Discard draft
+                  </Button>
+                </div>
+              </div>
+            )}
+            </Surface>
+          </section>
+        )}
+
+        {!isEditing && (
+          <Surface className="product-form-section image-product-test">
+            <div className="form-section-heading">
+              <div>
+                <h2>Add product from image</h2>
+                <p>
+                  Use a package, product or shelf label to prepare an editable product draft.
+                </p>
+              </div>
+            </div>
+            <Alert tone="info">No product is created until you review the form and select Save product.</Alert>
+            <FormField htmlFor="product-image-upload" label="Product image">
+              <Input
+                id="product-image-upload"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                onChange={(event) => selectImage(event.target.files?.[0])}
+              />
+            </FormField>
+            <FormField
+              htmlFor="image-product-location"
+              label="Storage location"
+              required
+              hint="This is sent with the draft request. Images must be 5 MB or smaller."
+            >
+              <Input
+                id="image-product-location"
+                value={product.location ?? ''}
+                onChange={(event) => setProduct({ ...product, location: event.target.value })}
+                required
+              />
+            </FormField>
+            {imagePreviewUrl && (
+              <img
+                className="image-product-test__preview"
+                src={imagePreviewUrl}
+                alt="Selected product for extraction"
+              />
+            )}
+            <div className="voice-draft-review__actions">
+              <Button
+                type="button"
+                variant="secondary"
+                loading={imageCreateState.isLoading}
+                onClick={() => void prepareImageProductDraft()}
+              >
+                Prepare image draft
+              </Button>
+              {imageFile && (
+                <Button type="button" variant="ghost" onClick={() => selectImage()}>
+                  Clear image
+                </Button>
+              )}
+            </div>
+            {imageError && <Alert tone="error">{imageError}</Alert>}
+            {imageResult && (
+              <div className="voice-draft-review" aria-live="polite">
+                <Alert tone="warning">
+                  No product has been created. Review the extracted details before applying them to
+                  this form.
+                </Alert>
+                {imageResult.ambiguousFields?.length ? (
+                  <Alert tone="warning">Check: {imageResult.ambiguousFields.join(', ')}.</Alert>
+                ) : null}
+                <div className="voice-draft-review__actions">
+                  <Button type="button" onClick={applyImageDraft}>
+                    Use details in product form
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setImageResult(undefined)}>
+                    Discard draft
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Surface>
+        )}
+
+        {isEditing && (
+          <Surface className="product-form-section voice-draft-entry">
+            <div className="form-section-heading">
+              <div>
+                <h2>Review product update by voice</h2>
+                <p>Describe a proposed price or stock change. Trada returns a suggestion only.</p>
+              </div>
+            </div>
+            <Alert tone="info">
+              Trada checks this product has not changed elsewhere before applying a reviewed voice
+              update.
+            </Alert>
+            <FormField
+              htmlFor="voice-product-update-text"
+              label="Proposed product change"
+              hint="For example: add 10 bags and change selling price to 4,500."
+            >
+              <Textarea
+                id="voice-product-update-text"
+                rows={3}
+                value={voiceUpdateText}
+                onChange={(event) => setVoiceUpdateText(event.target.value)}
+              />
+            </FormField>
+            <div className="voice-draft-review__actions">
+              <Button
+                type="button"
+                variant="secondary"
+                loading={voiceUpdateDraftState.isLoading}
+                onClick={() => void prepareVoiceUpdateSuggestion()}
+                icon={<FilePenLine aria-hidden="true" size={17} />}
+              >
+                Prepare update suggestion
+              </Button>
+            </div>
+            {voiceUpdateError && <Alert tone="warning">{voiceUpdateError}</Alert>}
+            {voiceUpdateDraft && (
+              <div className="voice-draft-review" aria-live="polite">
+                <div className="voice-draft-review__transcript">
+                  <span>Transcript</span>
+                  <p>{voiceUpdateDraft.transcript}</p>
+                </div>
+                <div className="voice-update-suggestion">
+                  <strong>Extracted suggestion</strong>
+                  <p>
+                    {voiceUpdateDraft.stockMovement
+                      ? `Stock: ${voiceUpdateDraft.stockMovement.currentQuantity} ${voiceUpdateDraft.stockMovement.quantityMode === 'subtract' ? '−' : '+'} ${voiceUpdateDraft.stockMovement.quantityDelta} → ${voiceUpdateDraft.stockMovement.resultingQuantity}. `
+                      : voiceUpdateDraft.extractedFields?.quantityMode
+                        ? `Quantity: ${voiceUpdateDraft.extractedFields.quantityMode} ${voiceUpdateDraft.extractedFields.quantity ?? 'not provided'}. `
+                      : ''}
+                    {(voiceUpdateDraft.draft?.sellingPrice ?? voiceUpdateDraft.extractedFields?.sellingPrice) != null
+                      ? `Selling price: ₦${voiceUpdateDraft.draft?.sellingPrice ?? voiceUpdateDraft.extractedFields?.sellingPrice}.`
+                      : 'No sale-ready product change was extracted.'}
+                  </p>
+                </div>
+                <Alert tone="warning">
+                  No product change has been made yet. Review the proposed stock and price before
+                  applying it.
+                </Alert>
+                <div className="voice-draft-review__actions">
+                  <Button
+                    type="button"
+                    loading={updateState.isLoading}
+                    disabled={!voiceUpdateDraft.draft || !voiceUpdateDraft.stockMovement}
+                    onClick={() => void applyVoiceUpdate()}
+                  >
+                    Apply reviewed update
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setVoiceUpdateDraft(undefined)}
+                  >
+                    Discard suggestion
+                  </Button>
+                </div>
+              </div>
+            )}
+            {voiceUpdateConflict && (
+              <div className="voice-draft-review" role="alert">
+                <Alert tone="warning">
+                  This product changed on another device. Current stock: {voiceUpdateConflict.currentProduct.quantity}; current selling price: ₦{voiceUpdateConflict.currentProduct.sellingPrice}.
+                </Alert>
+                <div className="voice-draft-review__actions">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      void refetch();
+                      void prepareVoiceUpdateSuggestion();
+                    }}
+                  >
+                    Recalculate voice update
+                  </Button>
+                  <Button
+                    type="button"
+                    loading={updateState.isLoading}
+                    onClick={() => void applyVoiceUpdate(voiceUpdateConflict.serverCurrentUpdatedAt)}
+                  >
+                    Confirm overwrite
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Surface>
         )}
 
         <div className="product-form-layout">
@@ -480,4 +1160,31 @@ function ProductFormSkeleton() {
       <div className="skeleton skeleton--briefing" />
     </div>
   );
+}
+
+function recordingToDataUrl(recording: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener('load', () => resolve(String(reader.result)));
+    reader.addEventListener('error', () => reject(reader.error));
+    reader.readAsDataURL(recording);
+  });
+}
+
+function formatRecordingDuration(durationSeconds: number) {
+  const minutes = Math.floor(durationSeconds / 60);
+  return `${minutes}:${(durationSeconds % 60).toString().padStart(2, '0')}`;
+}
+
+function formatFileSize(bytes: number) {
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener('load', () => resolve(String(reader.result)));
+    reader.addEventListener('error', () => reject(reader.error));
+    reader.readAsDataURL(file);
+  });
 }

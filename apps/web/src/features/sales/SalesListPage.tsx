@@ -5,6 +5,7 @@ import {
   ArrowRight,
   Banknote,
   CircleDollarSign,
+  Mic,
   Plus,
   ReceiptText,
   RefreshCw,
@@ -75,11 +76,18 @@ export function SalesListPage() {
         title="Sales activity"
         description="Find receipts and audit booked revenue, money received and outstanding balances separately."
         actions={
-          <Button asChild>
-            <Link to="/sales/new">
-              <Plus aria-hidden="true" size={18} /> Record sale
-            </Link>
-          </Button>
+          <div className="sales-primary-actions">
+            <Button asChild>
+              <Link to="/sales/new">
+                <Plus aria-hidden="true" size={18} /> Record sale
+              </Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link to="/sales/new?ai=voice">
+                <Mic aria-hidden="true" size={17} /> Voice sale
+              </Link>
+            </Button>
+          </div>
         }
       />
 

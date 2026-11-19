@@ -217,7 +217,7 @@ export function AppShell({
               aria-current={activeNav === id ? 'page' : undefined}
               onClick={(event) => handleNavigate(event, href)}
             >
-              <Icon aria-hidden="true" size={21} />
+              <Icon aria-hidden="true" size={17} />
               <span>{label}</span>
             </a>
           );
@@ -245,7 +245,7 @@ export function AppShell({
               aria-current={activeNav === id ? 'page' : undefined}
               onClick={(event) => handleNavigate(event, href)}
             >
-              <Icon aria-hidden="true" size={21} />
+              <Icon aria-hidden="true" size={17} />
               <span>{label}</span>
             </a>
           );
@@ -258,7 +258,7 @@ export function AppShell({
           aria-expanded={mobilePanel === 'more'}
           onClick={() => setMobilePanel((panel) => (panel === 'more' ? null : 'more'))}
         >
-          <MoreHorizontal aria-hidden="true" size={23} />
+          <MoreHorizontal aria-hidden="true" size={17} />
           <span>More</span>
         </button>
       </nav>

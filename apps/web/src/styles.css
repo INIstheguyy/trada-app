@@ -159,7 +159,7 @@
 .sd-main {
   width: min(100%, 1440px);
   margin: auto;
-  padding: 24px 16px 130px;
+  padding: 24px 16px 110px;
 }
 .sd-bottom-nav {
   height: 70px;
@@ -3638,8 +3638,8 @@ html.access-viewport-locked #root {
 
 /* Reference-led mobile shell and module composition. */
 .sd-bottom-nav {
-  height: 82px;
-  padding: 7px 8px max(10px, env(safe-area-inset-bottom));
+  height: 72px;
+  padding: 2px 8px max(8px, env(safe-area-inset-bottom));
   border: 0;
   border-radius: 26px 26px 0 0;
   background: linear-gradient(120deg, var(--sd-navy-950), var(--sd-navy-900));
@@ -3649,7 +3649,7 @@ html.access-viewport-locked #root {
 }
 .sd-bottom-nav__item,
 .sd-bottom-nav__more {
-  min-height: 58px;
+  min-height: 48px;
   padding: 0;
   border: 0;
   color: #d7e4ec;

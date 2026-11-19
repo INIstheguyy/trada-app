@@ -129,8 +129,44 @@
 .sd-select:focus,
 .sd-textarea:focus {
   border-color: var(--sd-focus);
-  box-shadow: var(--sd-focus-ring);
+  box-shadow: none;
   outline: none;
+}
+
+.sd-password-input {
+  width: 100%;
+  position: relative;
+}
+
+.sd-password-input__control {
+  padding-right: 48px;
+}
+
+.sd-password-input__toggle {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--sd-text-muted);
+  background: transparent;
+  display: grid;
+  place-items: center;
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.sd-password-input__toggle:hover {
+  color: var(--sd-text-primary);
+  background: var(--sd-slate-100);
+}
+
+.sd-password-input__toggle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--sd-focus) 45%, transparent);
+  outline-offset: 1px;
 }
 
 .sd-input[aria-invalid='true'],

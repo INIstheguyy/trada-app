@@ -1,5 +1,5 @@
 import { Alert, Button, FormField, Input, Select, Textarea } from '@trada/ui';
-import { Building2, CircleAlert, LoaderCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, CircleAlert, LoaderCircle } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router';
 import { AuthHeading, AuthLayout } from '../auth/AuthLayout';
@@ -21,10 +21,6 @@ const initialBusiness: BusinessInput = {
   industry: '',
 };
 
-const onboardingStory = {
-  trustMessage: 'Your business starts private. This setup does not publish a storefront.',
-};
-
 export function BusinessOnboardingPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -33,12 +29,13 @@ export function BusinessOnboardingPage() {
   const [createBusiness, createState] = useCreateBusinessMutation();
   const [business, setBusiness] = useState(initialBusiness);
   const [error, setError] = useState<string>();
+  const [setupStep, setSetupStep] = useState<1 | 2>(1);
 
   if (businessQuery.data) return <Navigate to={destination} replace />;
 
   if (businessQuery.isLoading || businessQuery.isFetching) {
     return (
-      <AuthLayout {...onboardingStory}>
+      <AuthLayout>
         <div className="access-state" role="status">
           <span className="access-state__icon">
             <LoaderCircle className="sd-spin" aria-hidden="true" size={24} />
@@ -52,7 +49,7 @@ export function BusinessOnboardingPage() {
 
   if (apiStatus(businessQuery.error) !== 404) {
     return (
-      <AuthLayout {...onboardingStory}>
+      <AuthLayout>
         <div className="access-state" role="alert">
           <span className="access-state__icon access-state__icon--error">
             <CircleAlert aria-hidden="true" size={24} />
@@ -70,6 +67,11 @@ export function BusinessOnboardingPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(undefined);
+
+    if (setupStep === 1) {
+      continueToBusinessOperations();
+      return;
+    }
 
     try {
       await createBusiness({
@@ -97,11 +99,33 @@ export function BusinessOnboardingPage() {
     }
   }
 
+  function continueToBusinessOperations() {
+    if (!business.name.trim() || !business.description.trim()) {
+      setError('Enter your business name and description to continue.');
+      return;
+    }
+
+    setError(undefined);
+    setSetupStep(2);
+    window.requestAnimationFrame(() => document.getElementById('business-category')?.focus());
+  }
+
+  function returnToBusinessIdentity() {
+    setError(undefined);
+    setSetupStep(1);
+    window.requestAnimationFrame(() => document.getElementById('business-name')?.focus());
+  }
+
   return (
-    <AuthLayout {...onboardingStory}>
-      <div className="access-step" aria-label="Setup progress">
-        <span>Account created</span>
-        <strong>Business setup</strong>
+    <AuthLayout mobileActionLabel="Set up your business">
+      <div className="onboarding-progress" aria-label={`Business setup, step ${setupStep} of 2`}>
+        <span className={setupStep === 1 ? 'is-current' : 'is-complete'}>
+          <b>1</b> Business profile
+        </span>
+        <i aria-hidden="true" />
+        <span className={setupStep === 2 ? 'is-current' : ''}>
+          <b>2</b> Business operations
+        </span>
       </div>
 
       <AuthHeading
@@ -110,74 +134,112 @@ export function BusinessOnboardingPage() {
         description="Start with the required identity for your products, sales and reports."
       />
 
-      <form className="access-form" onSubmit={handleSubmit}>
+      <form className="access-form access-form--onboarding" onSubmit={handleSubmit}>
         {error && (
           <Alert tone="error" icon={<CircleAlert aria-hidden="true" size={18} />}>
             {error}
           </Alert>
         )}
 
-        <BusinessField
-          id="business-name"
-          label="Business name"
-          value={business.name}
-          onChange={(name) => setBusiness({ ...business, name })}
-          placeholder="e.g. Acme Motors"
-        />
-
-        <FormField htmlFor="business-description" label="Business description">
-          <Textarea
-            id="business-description"
-            required
-            rows={3}
-            value={business.description}
-            onChange={(event) => setBusiness({ ...business, description: event.target.value })}
-            placeholder="What does your business sell or provide?"
-          />
-        </FormField>
-
-        <div className="access-field-row">
-          <FormField htmlFor="business-category" label="Business category">
-            <Select
-              id="business-category"
-              value={business.category}
-              onChange={(event) => setBusiness({ ...business, category: event.target.value })}
-            >
-              <option value="Inventory based">Inventory based</option>
-              <option value="Input based">Input based</option>
-            </Select>
-          </FormField>
-          <FormField htmlFor="business-currency" label="Working currency">
-            <Select
-              id="business-currency"
-              value={business.currency}
-              onChange={(event) => setBusiness({ ...business, currency: event.target.value })}
-            >
-              <option value="NGN">Nigerian naira (NGN)</option>
-            </Select>
-          </FormField>
-        </div>
-
-        <BusinessField
-          id="business-industry"
-          label="Industry"
-          value={business.industry}
-          onChange={(industry) => setBusiness({ ...business, industry })}
-          placeholder="e.g. Automotive, Retail, Food"
-        />
-
-        <Alert tone="info">
-          Your workspace will remain private. Publishing is not part of this setup.
-        </Alert>
-
-        <Button
-          type="submit"
-          className="access-submit"
-          loading={createState.isLoading}
-          icon={<Building2 aria-hidden="true" size={18} />}
+        <section
+          className={`onboarding-stage${setupStep !== 1 ? ' is-hidden' : ''}`}
+          aria-labelledby="business-profile-heading"
         >
-          Create business
-        </Button>
+          <header className="onboarding-stage__heading">
+            <span>Step 1 of 2</span>
+            <h3 id="business-profile-heading">Tell us about your business</h3>
+            <p>Start with the name customers know and a short description.</p>
+          </header>
+
+          <BusinessField
+            id="business-name"
+            label="Business name"
+            value={business.name}
+            onChange={(name) => setBusiness({ ...business, name })}
+            placeholder="e.g. Acme Motors"
+          />
+
+          <FormField htmlFor="business-description" label="Business description">
+            <Textarea
+              id="business-description"
+              required
+              rows={3}
+              value={business.description}
+              onChange={(event) => setBusiness({ ...business, description: event.target.value })}
+              placeholder="What does your business sell or provide?"
+            />
+          </FormField>
+
+          <Button
+            type="button"
+            className="onboarding-next"
+            icon={<ArrowRight aria-hidden="true" size={18} />}
+            onClick={continueToBusinessOperations}
+          >
+            Continue
+          </Button>
+        </section>
+
+        <section
+          className={`onboarding-stage${setupStep !== 2 ? ' is-hidden' : ''}`}
+          aria-labelledby="business-operations-heading"
+        >
+          <header className="onboarding-stage__heading">
+            <span>Step 2 of 2</span>
+            <h3 id="business-operations-heading">How does your business operate?</h3>
+            <p>These details configure your stock, sales and reporting defaults.</p>
+          </header>
+
+          <div className="access-field-row">
+            <FormField htmlFor="business-category" label="Business category">
+              <Select
+                id="business-category"
+                value={business.category}
+                onChange={(event) => setBusiness({ ...business, category: event.target.value })}
+              >
+                <option value="Inventory based">Inventory based</option>
+                <option value="Input based">Input based</option>
+              </Select>
+            </FormField>
+            <FormField htmlFor="business-currency" label="Working currency">
+              <Select
+                id="business-currency"
+                value={business.currency}
+                onChange={(event) => setBusiness({ ...business, currency: event.target.value })}
+              >
+                <option value="NGN">Nigerian naira (NGN)</option>
+              </Select>
+            </FormField>
+          </div>
+
+          <BusinessField
+            id="business-industry"
+            label="Industry"
+            value={business.industry}
+            onChange={(industry) => setBusiness({ ...business, industry })}
+            placeholder="e.g. Automotive, Retail, Food"
+          />
+
+          <div className="onboarding-step-actions">
+            <Button
+              type="button"
+              variant="secondary"
+              className="onboarding-back"
+              icon={<ArrowLeft aria-hidden="true" size={18} />}
+              onClick={returnToBusinessIdentity}
+            >
+              Back
+            </Button>
+            <Button
+              type="submit"
+              className="access-submit"
+              loading={createState.isLoading}
+              icon={<Building2 aria-hidden="true" size={18} />}
+            >
+              Create business
+            </Button>
+          </div>
+        </section>
       </form>
     </AuthLayout>
   );

@@ -100,6 +100,11 @@ test('shows actionable stock and product status without merging their meanings',
 
 test('sends supported type, status and search filters to the product query', () => {
   renderPage();
+  expect(screen.queryByRole('search')).not.toBeInTheDocument();
+  const filterToggle = screen.getByRole('button', { name: 'Filter' });
+  expect(filterToggle).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(filterToggle);
+  expect(filterToggle).toHaveAttribute('aria-expanded', 'true');
   fireEvent.change(screen.getByLabelText('Filter by product type'), {
     target: { value: 'inventory_based' },
   });
@@ -115,4 +120,18 @@ test('sends supported type, status and search filters to the product query', () 
     isActive: false,
     page: 1,
   });
+});
+
+test('centres inventory creation and filter actions in one toolbar', () => {
+  renderPage();
+  const toolbar = screen.getByLabelText('Inventory actions');
+  expect(within(toolbar).getByRole('link', { name: 'Add product' })).toHaveAttribute(
+    'href',
+    '/products/new',
+  );
+  expect(within(toolbar).getByRole('link', { name: 'Voice product' })).toHaveAttribute(
+    'href',
+    '/products/new?ai=voice',
+  );
+  expect(within(toolbar).getByRole('button', { name: 'Filter' })).toBeInTheDocument();
 });

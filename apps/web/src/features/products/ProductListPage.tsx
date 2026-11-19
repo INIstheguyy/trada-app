@@ -4,7 +4,9 @@ import {
   ArrowLeft,
   ArrowRight,
   Boxes,
+  ChevronDown,
   CircleDollarSign,
+  Mic,
   PackagePlus,
   RefreshCw,
   Repeat2,
@@ -32,6 +34,7 @@ export function ProductListPage() {
   const [search, setSearch] = useState('');
   const [type, setType] = useState<ProductType | ''>('');
   const [status, setStatus] = useState<StatusFilter>('all');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const query: ProductListParams = {
     search: search || undefined,
@@ -66,16 +69,47 @@ export function ProductListPage() {
         eyebrow="Inventory"
         title="Inventory"
         description="Find products, review stock levels and keep selling details accurate."
-        actions={
-          can(role, 'product:create') ? (
+      />
+
+      <div className="inventory-control-toolbar" aria-label="Inventory actions">
+        {can(role, 'product:create') && (
+          <>
             <Button asChild>
               <Link to="/products/new">
                 <PackagePlus aria-hidden="true" size={18} /> Add product
               </Link>
             </Button>
-          ) : undefined
-        }
-      />
+            <Button asChild variant="secondary">
+              <Link to="/products/new?ai=voice">
+                <Mic aria-hidden="true" size={17} /> Voice product
+              </Link>
+            </Button>
+          </>
+        )}
+        <Button
+          className="inventory-filter-toggle"
+          type="button"
+          variant="secondary"
+          aria-expanded={filtersOpen}
+          aria-controls="inventory-filter-panel"
+          onClick={() => setFiltersOpen((open) => !open)}
+        >
+          <SlidersHorizontal aria-hidden="true" size={17} />
+          Filter
+          {hasFilters && (
+            <span className="inventory-filter-toggle__status" aria-label="Filters applied" />
+          )}
+          <ChevronDown
+            aria-hidden="true"
+            className={
+              filtersOpen
+                ? 'inventory-filter-toggle__chevron is-open'
+                : 'inventory-filter-toggle__chevron'
+            }
+            size={15}
+          />
+        </Button>
+      </div>
 
       <div className="inventory-summary" aria-label="Inventory summary">
         <InventoryMetric
@@ -141,69 +175,74 @@ export function ProductListPage() {
       ) : null}
 
       <Surface className="products-panel">
-        <div className="products-toolbar">
-          <form className="products-search" onSubmit={handleSearch} role="search">
-            <Search aria-hidden="true" size={18} />
-            <Input
-              aria-label="Search products"
-              type="search"
-              placeholder="Search name, SKU or barcode"
-              value={draftSearch}
-              onChange={(event) => setDraftSearch(event.target.value)}
-            />
-            <button type="submit">Search</button>
-          </form>
-          <button
-            className="icon-button"
-            type="button"
-            onClick={() => void refetch()}
-            aria-label="Refresh products"
-          >
-            <RefreshCw aria-hidden="true" size={17} className={isFetching ? 'sd-spin' : ''} />
-          </button>
-        </div>
-
-        <div className="inventory-filters" aria-label="Product filters">
-          <span className="inventory-filters__label">
-            <SlidersHorizontal aria-hidden="true" size={16} /> Filters
-          </span>
-          <Select
-            aria-label="Filter by product type"
-            value={type}
-            onChange={(event) => {
-              setType(event.target.value as ProductType | '');
-              setPage(1);
-            }}
-          >
-            <option value="">All product types</option>
-            <option value="inventory_based">Inventory based</option>
-            <option value="input_based">Input based / service</option>
-          </Select>
-          <Select
-            aria-label="Filter by product status"
-            value={status}
-            onChange={(event) => {
-              setStatus(event.target.value as StatusFilter);
-              setPage(1);
-            }}
-          >
-            <option value="all">All statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </Select>
-          {hasFilters && (
-            <button className="inventory-filters__clear" type="button" onClick={clearFilters}>
-              Clear filters
-            </button>
-          )}
-        </div>
+        {filtersOpen && (
+          <div id="inventory-filter-panel" className="inventory-filter-panel">
+            <form
+              className="inventory-filters"
+              aria-label="Product filters"
+              onSubmit={handleSearch}
+              role="search"
+            >
+              <label className="products-search">
+                <Search aria-hidden="true" size={18} />
+                <Input
+                  aria-label="Search products"
+                  type="search"
+                  placeholder="Search name, SKU or barcode"
+                  value={draftSearch}
+                  onChange={(event) => setDraftSearch(event.target.value)}
+                />
+              </label>
+              <Select
+                aria-label="Filter by product type"
+                value={type}
+                onChange={(event) => {
+                  setType(event.target.value as ProductType | '');
+                  setPage(1);
+                }}
+              >
+                <option value="">All product types</option>
+                <option value="inventory_based">Inventory based</option>
+                <option value="input_based">Input based / service</option>
+              </Select>
+              <Select
+                aria-label="Filter by product status"
+                value={status}
+                onChange={(event) => {
+                  setStatus(event.target.value as StatusFilter);
+                  setPage(1);
+                }}
+              >
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </Select>
+              <button className="inventory-filters__apply" type="submit">
+                Apply
+              </button>
+            </form>
+          </div>
+        )}
 
         {data && !isLoading && (
           <div className="inventory-results" role="status">
             <span>
               {data.pagination.total} {data.pagination.total === 1 ? 'product' : 'products'} found
             </span>
-            {search && <span>Search: “{search}”</span>}
+            <div>
+              {hasFilters && (
+                <button type="button" onClick={clearFilters}>
+                  Clear filters
+                </button>
+              )}
+              <button type="button" onClick={() => void refetch()} aria-label="Refresh products">
+                <RefreshCw
+                  aria-hidden="true"
+                  size={16}
+                  className={isFetching ? 'sd-spin' : ''}
+                />
+              </button>
+            </div>
           </div>
         )}
 

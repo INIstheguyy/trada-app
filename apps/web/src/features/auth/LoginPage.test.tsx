@@ -19,6 +19,7 @@ test('shows only the supported email and password sign-in contract', () => {
   expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument();
   expect(screen.getByLabelText('Email address')).toBeRequired();
   expect(screen.getByLabelText('Password')).toBeRequired();
+  expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password');
   expect(screen.queryByText(/continue with google/i)).not.toBeInTheDocument();
   expect(screen.queryByText(/one-time password|otp/i)).not.toBeInTheDocument();
   expect(screen.queryByText(/workspace is available only/i)).not.toBeInTheDocument();
@@ -33,4 +34,11 @@ test('shows only the supported email and password sign-in contract', () => {
 
   fireEvent.click(screen.getByRole('button', { name: 'Close sign in form' }));
   expect(panel).not.toHaveClass('is-mobile-open');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Show password' }));
+  expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'text');
+  expect(screen.getByRole('button', { name: 'Hide password' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 });

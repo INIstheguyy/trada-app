@@ -1,16 +1,16 @@
-import { Alert, Badge, Button, EmptyState, Input, PageHeader, Select, Surface } from '@trada/ui';
+import { Alert, Button, EmptyState, Input, PageHeader, Select, Surface } from '@trada/ui';
 import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
-  Banknote,
-  CircleDollarSign,
+  ChevronDown,
+  ListFilter,
   Mic,
   Plus,
   ReceiptText,
   RefreshCw,
   Search,
-  TrendingUp,
+  ShoppingCart,
 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
@@ -29,6 +29,7 @@ export function SalesListPage() {
   const [saleStatus, setSaleStatus] = useState<SaleStatus | ''>('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const query = {
     search: search || undefined,
@@ -72,24 +73,39 @@ export function SalesListPage() {
   return (
     <div className="sales-page">
       <PageHeader
-        eyebrow="Sales"
-        title="Sales activity"
-        description="Find receipts and audit booked revenue, money received and outstanding balances separately."
-        actions={
-          <div className="sales-primary-actions">
-            <Button asChild>
-              <Link to="/sales/new">
-                <Plus aria-hidden="true" size={18} /> Record sale
-              </Link>
-            </Button>
-            <Button asChild variant="secondary">
-              <Link to="/sales/new?ai=voice">
-                <Mic aria-hidden="true" size={17} /> Voice sale
-              </Link>
-            </Button>
-          </div>
-        }
+        title="Sales"
+        description="Record sales, view performance and track revenue."
       />
+
+      <div className="sales-control-toolbar" aria-label="Sales actions">
+        <Button asChild>
+          <Link to="/sales/new">
+            <Plus aria-hidden="true" size={18} /> Record sale
+          </Link>
+        </Button>
+        <Button asChild variant="secondary">
+          <Link to="/sales/new?ai=voice">
+            <Mic aria-hidden="true" size={17} /> Voice sale
+          </Link>
+        </Button>
+        <Button
+          className="sales-filter-toggle"
+          type="button"
+          variant="secondary"
+          aria-expanded={filtersOpen}
+          aria-controls="sales-filter-panel"
+          onClick={() => setFiltersOpen((open) => !open)}
+        >
+          <ListFilter aria-hidden="true" size={17} />
+          Filter
+          {hasFilters && <span className="sales-filter-toggle__status" aria-label="Filters applied" />}
+          <ChevronDown
+            aria-hidden="true"
+            className={filtersOpen ? 'sales-filter-toggle__chevron is-open' : 'sales-filter-toggle__chevron'}
+            size={15}
+          />
+        </Button>
+      </div>
 
       {analytics.isError && (
         <Alert tone="warning" icon={<AlertCircle aria-hidden="true" size={18} />}>
@@ -99,100 +115,95 @@ export function SalesListPage() {
 
       <div className="sales-metrics">
         <Metric
-          icon={ReceiptText}
           label="Recorded sales"
-          value={analytics.data ? String(analytics.data.totalSalesCount) : 'Unavailable'}
-          note="For the selected date range"
+          value={analytics.data ? String(analytics.data.totalSalesCount) : '—'}
         />
         <Metric
-          icon={TrendingUp}
           label="Booked revenue"
-          value={analytics.data ? formatNaira.format(analytics.data.totalRevenue) : 'Unavailable'}
-          note="Not the same as cash received"
+          value={analytics.data ? formatNaira.format(analytics.data.totalRevenue) : '—'}
         />
         <Metric
-          icon={CircleDollarSign}
           label="Gross profit"
-          value={analytics.data ? formatNaira.format(analytics.data.grossProfit) : 'Unavailable'}
-          note="Qualified: missing-cost treatment is undefined"
-          qualified
+          value={analytics.data ? formatNaira.format(analytics.data.grossProfit) : '—'}
         />
         <Metric
-          icon={Banknote}
           label="Unpaid sale balance"
-          value={analytics.data ? formatNaira.format(analytics.data.unpaidBalance) : 'Unavailable'}
-          note="Not a verified customer debtor ledger"
-          qualified
-          warning={Boolean(analytics.data?.unpaidBalance)}
+          value={analytics.data ? formatNaira.format(analytics.data.unpaidBalance) : '—'}
         />
       </div>
 
       <Surface className="sales-panel">
-        <form className="sales-filters" onSubmit={handleFilter} role="search">
-          <label className="sales-search">
-            <Search aria-hidden="true" size={17} />
-            <Input
-              aria-label="Search sales"
-              placeholder="Receipt or customer"
-              value={draftSearch}
-              onChange={(event) => setDraftSearch(event.target.value)}
-            />
-          </label>
-          <Select
-            aria-label="Payment status"
-            value={paymentStatus}
-            onChange={(event) => {
-              setPaymentStatus(event.target.value as PaymentStatus | '');
-              setPage(1);
-            }}
-          >
-            <option value="">All payment statuses</option>
-            <option value="paid">Paid</option>
-            <option value="partially_paid">Partially paid</option>
-            <option value="unpaid">Unpaid</option>
-            <option value="refunded">Refunded</option>
-          </Select>
-          <Select
-            aria-label="Sale status"
-            value={saleStatus}
-            onChange={(event) => {
-              setSaleStatus(event.target.value as SaleStatus | '');
-              setPage(1);
-            }}
-          >
-            <option value="">All sale statuses</option>
-            <option value="completed">Completed</option>
-            <option value="pending">Pending</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="refunded">Refunded</option>
-          </Select>
-          <label className="date-filter">
-            <span>From</span>
-            <Input
-              aria-label="Sales from date"
-              type="date"
-              value={startDate}
-              onChange={(event) => {
-                setStartDate(event.target.value);
-                setPage(1);
-              }}
-            />
-          </label>
-          <label className="date-filter">
-            <span>To</span>
-            <Input
-              aria-label="Sales to date"
-              type="date"
-              min={startDate || undefined}
-              value={endDate}
-              onChange={(event) => {
-                setEndDate(event.target.value);
-                setPage(1);
-              }}
-            />
-          </label>
-          <button type="submit">Apply</button>
-        </form>
+        {filtersOpen && (
+          <div id="sales-filter-panel" className="sales-filter-panel">
+            <form className="sales-filters" onSubmit={handleFilter} role="search">
+              <label className="sales-search">
+                <Search aria-hidden="true" size={17} />
+                <Input
+                  aria-label="Search sales"
+                  placeholder="Receipt or customer"
+                  value={draftSearch}
+                  onChange={(event) => setDraftSearch(event.target.value)}
+                />
+              </label>
+              <Select
+                aria-label="Payment status"
+                value={paymentStatus}
+                onChange={(event) => {
+                  setPaymentStatus(event.target.value as PaymentStatus | '');
+                  setPage(1);
+                }}
+              >
+                <option value="">All payment statuses</option>
+                <option value="paid">Paid</option>
+                <option value="partially_paid">Partially paid</option>
+                <option value="unpaid">Unpaid</option>
+                <option value="refunded">Refunded</option>
+              </Select>
+              <Select
+                aria-label="Sale status"
+                value={saleStatus}
+                onChange={(event) => {
+                  setSaleStatus(event.target.value as SaleStatus | '');
+                  setPage(1);
+                }}
+              >
+                <option value="">All sale statuses</option>
+                <option value="completed">Completed</option>
+                <option value="pending">Pending</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="refunded">Refunded</option>
+              </Select>
+              <div className="sales-date-range">
+                <label className="date-filter">
+                  <span>From</span>
+                  <Input
+                    aria-label="Sales from date"
+                    type="date"
+                    value={startDate}
+                    onChange={(event) => {
+                      setStartDate(event.target.value);
+                      setPage(1);
+                    }}
+                  />
+                </label>
+                <label className="date-filter">
+                  <span>To</span>
+                  <Input
+                    aria-label="Sales to date"
+                    type="date"
+                    min={startDate || undefined}
+                    value={endDate}
+                    onChange={(event) => {
+                      setEndDate(event.target.value);
+                      setPage(1);
+                    }}
+                  />
+                </label>
+              </div>
+              <button type="submit">Apply</button>
+            </form>
+          </div>
+        )}
 
         <div className="sales-results" role="status">
           <span>
@@ -250,46 +261,31 @@ export function SalesListPage() {
           />
         ) : (
           <>
-            <div className="sales-table" role="table" aria-label="Sales records">
-              <div className="sales-table__header" role="row">
-                <span>Receipt / customer</span>
-                <span>Total</span>
-                <span>Received</span>
-                <span>Balance</span>
-                <span>Status</span>
-                <span />
-              </div>
+            <ul className="sales-list" aria-label="Sales records">
               {sales.data?.sales.map((sale) => (
-                <article className="sales-row" role="row" key={sale.id}>
-                  <div className="sale-primary" role="cell">
-                    <strong>{sale.receiptNumber}</strong>
-                    <small>
-                      {sale.customerName || 'Walk-in customer'} · {formatDate(sale.createdAt)}
-                    </small>
-                  </div>
-                  <SaleAmount label="Total" value={sale.totalAmount} />
-                  <SaleAmount label="Received" value={sale.amountPaid} />
-                  <SaleAmount
-                    label="Balance"
-                    value={sale.balanceDue}
-                    warning={sale.balanceDue > 0}
-                  />
-                  <div className="sale-status" role="cell">
-                    <Badge className={sale.paymentStatus === 'paid' ? '' : 'sd-badge--warning'}>
-                      {formatStatus(sale.paymentStatus)}
-                    </Badge>
-                    <small>{formatStatus(sale.status)}</small>
-                  </div>
+                <li key={sale.id}>
                   <Link
-                    className="product-row-link"
+                    className="sales-list-item"
                     to={`/sales/${sale.id}`}
                     aria-label={`View ${sale.receiptNumber}`}
                   >
-                    <ArrowRight aria-hidden="true" size={18} />
+                    <span className="sales-list-item__icon">
+                      <ShoppingCart aria-hidden="true" size={19} />
+                    </span>
+                    <span className="sales-list-item__primary">
+                      <strong>{formatSaleLabel(sale)}</strong>
+                      <small>{formatSaleTimestamp(sale.createdAt)}</small>
+                    </span>
+                    <span className={`sales-payment-method sales-payment-method--${sale.paymentMethod}`}>
+                      {formatPaymentMethod(sale.paymentMethod)}
+                    </span>
+                    <strong className="sales-list-item__amount">
+                      {formatNaira.format(sale.totalAmount)}
+                    </strong>
                   </Link>
-                </article>
+                </li>
               ))}
-            </div>
+            </ul>
             {sales.data && sales.data.pagination.totalPages > 1 && (
               <nav className="pagination" aria-label="Sales pages">
                 <button
@@ -319,48 +315,17 @@ export function SalesListPage() {
 }
 
 function Metric({
-  icon: Icon,
   label,
   value,
-  note,
-  warning = false,
-  qualified = false,
 }: {
-  icon: typeof ReceiptText;
   label: string;
   value: string;
-  note: string;
-  warning?: boolean;
-  qualified?: boolean;
 }) {
   return (
     <Surface className="sales-metric">
-      <div className="sales-metric__top">
-        <span className={warning ? 'sales-metric__icon is-warning' : 'sales-metric__icon'}>
-          <Icon aria-hidden="true" size={19} />
-        </span>
-        {qualified && <Badge className="sd-badge--warning">Qualified</Badge>}
-      </div>
       <p>{label}</p>
       <strong>{value}</strong>
-      <small>{note}</small>
     </Surface>
-  );
-}
-function SaleAmount({
-  label,
-  value,
-  warning = false,
-}: {
-  label: string;
-  value: number;
-  warning?: boolean;
-}) {
-  return (
-    <div className={warning ? 'sale-amount is-warning' : 'sale-amount'} role="cell">
-      <small>{label}</small>
-      <strong>{formatNaira.format(value)}</strong>
-    </div>
   );
 }
 function SalesSkeleton() {
@@ -375,6 +340,30 @@ function SalesSkeleton() {
 function formatStatus(value: string) {
   return value.replaceAll('_', ' ').replace(/^./, (letter) => letter.toUpperCase());
 }
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat('en-NG', { dateStyle: 'medium' }).format(new Date(value));
+function formatPaymentMethod(value: string) {
+  if (value === 'pos') return 'POS/Card';
+  return formatStatus(value);
+}
+function formatSaleLabel(sale: {
+  receiptNumber: string;
+  items: Array<{ productName: string; quantity: number }>;
+}) {
+  const [firstItem] = sale.items;
+  if (!firstItem) return sale.receiptNumber;
+  const quantity = Number.isInteger(firstItem.quantity)
+    ? String(firstItem.quantity)
+    : firstItem.quantity.toLocaleString('en-NG', { maximumFractionDigits: 2 });
+  const firstLabel = `${firstItem.productName}${firstItem.quantity === 1 ? '' : ` (x${quantity})`}`;
+  return sale.items.length === 1 ? firstLabel : `${firstLabel} +${sale.items.length - 1} more`;
+}
+function formatSaleTimestamp(value: string) {
+  const date = new Date(value);
+  const today = new Date();
+  const sameDay = date.toDateString() === today.toDateString();
+  const time = new Intl.DateTimeFormat('en-NG', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+  if (sameDay) return `Today, ${time}`;
+  return new Intl.DateTimeFormat('en-NG', { dateStyle: 'medium' }).format(date);
 }

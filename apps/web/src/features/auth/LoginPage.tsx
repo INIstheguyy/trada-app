@@ -1,4 +1,4 @@
-import { Alert, Button, FormField, Input } from '@trada/ui';
+import { Alert, Button, FormField, Input, PasswordInput } from '@trada/ui';
 import { CheckCircle2, CircleAlert } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router';
@@ -95,9 +95,8 @@ export function LoginPage() {
         </FormField>
 
         <FormField htmlFor="login-password" label="Password">
-          <Input
+          <PasswordInput
             id="login-password"
-            type="password"
             name="password"
             autoComplete="current-password"
             placeholder="Enter your password"

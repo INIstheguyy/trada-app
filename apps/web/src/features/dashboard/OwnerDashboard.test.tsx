@@ -80,19 +80,32 @@ function renderDashboard() {
   );
 }
 
-test('keeps revenue, cash, qualified profit and unpaid balance distinct', () => {
+test('shows available analytics and an explicit placeholder for inventory value', () => {
   renderDashboard();
-  expect(screen.getByText('Sales today')).toBeInTheDocument();
-  expect(screen.getByText('Cash received')).toBeInTheDocument();
-  expect(screen.getByText('Gross profit')).toBeInTheDocument();
+  expect(screen.getByText("Today's sales")).toBeInTheDocument();
+  expect(screen.getByText("Today's gross profit")).toBeInTheDocument();
+  expect(screen.getByText('Inventory value')).toBeInTheDocument();
   expect(screen.getByText('Unpaid sale balance')).toBeInTheDocument();
-  expect(screen.getByText('Unavailable')).toBeInTheDocument();
-  expect(screen.getByText('This is not a verified customer debtor ledger')).toBeInTheDocument();
+  expect(screen.getByLabelText('Data unavailable')).toHaveTextContent('—');
+  expect(screen.queryByText('Qualified')).not.toBeInTheDocument();
+});
+
+test('keeps the greeting and summary above the grouped middle actions', () => {
+  renderDashboard();
+  const greeting = screen.getByRole('heading', { level: 1 });
+  const summary = screen.getByLabelText(/Business summary for/);
+  const quickActions = screen.getByRole('heading', { name: 'Quick actions' }).closest('section');
+  const storePreview = screen.getByRole('heading', { name: 'Share your store' }).closest('section');
+
+  expect(greeting.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(summary.compareDocumentPosition(quickActions!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(quickActions?.parentElement).toHaveClass('dashboard-middle');
+  expect(storePreview?.parentElement).toBe(quickActions?.parentElement);
 });
 
 test('changes analytics and recent sales queries with the selected period', () => {
   renderDashboard();
-  fireEvent.click(screen.getByRole('button', { name: 'Last 7 days' }));
+  fireEvent.click(screen.getByRole('button', { name: '7 days' }));
 
   expect(mockState.analyticsParams).toEqual(
     mockState.salesParams && {
@@ -103,27 +116,35 @@ test('changes analytics and recent sales queries with the selected period', () =
   const start = new Date(`${mockState.analyticsParams?.startDate}T00:00:00Z`);
   const end = new Date(`${mockState.analyticsParams?.endDate}T00:00:00Z`);
   expect((end.getTime() - start.getTime()) / 86_400_000).toBe(6);
-  expect(screen.getByText('Sales — last 7 days')).toBeInTheDocument();
+  expect(screen.getByText('Sales revenue')).toBeInTheDocument();
 });
 
-test('shows only currently available operational next actions', () => {
+test('shows available quick actions and keeps low stock behind a count toggle', () => {
   renderDashboard();
-  expect(screen.getByRole('link', { name: /Record a sale/ })).toHaveAttribute('href', '/sales/new');
-  expect(screen.getByRole('link', { name: /Add a product/ })).toHaveAttribute(
-    'href',
-    '/products/new',
-  );
-  expect(screen.getByRole('link', { name: /Review inventory/ })).toHaveAttribute(
-    'href',
-    '/products',
-  );
+  expect(screen.getByRole('link', { name: /Record sale/ })).toHaveAttribute('href', '/sales/new');
+  expect(screen.getByRole('link', { name: /Add product/ })).toHaveAttribute('href', '/products/new');
+  expect(screen.getByRole('link', { name: /Inventory/ })).toHaveAttribute('href', '/products');
+  const lowStockToggle = screen.getByRole('button', { name: /Low stock/ });
+  expect(lowStockToggle).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(lowStockToggle);
+  expect(lowStockToggle).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByText('Stock levels look healthy right now.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Coming soon' })).toBeDisabled();
 });
 
 test('keeps available dashboard sections visible when one endpoint fails', () => {
   mockState.lowStockError = true;
   renderDashboard();
-  expect(screen.getByText('Sales today')).toBeInTheDocument();
-  expect(screen.getByText('Partial data')).toBeInTheDocument();
+  expect(screen.getByText("Today's sales")).toBeInTheDocument();
+  expect(screen.getByText(/Some dashboard information could not be loaded/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /Low stock/ }));
   expect(screen.getByText('Low-stock data is unavailable.')).toBeInTheDocument();
   expect(screen.getByText('No sales recorded today.')).toBeInTheDocument();
+});
+
+test('queries a selected calendar day as an inclusive single-day range', () => {
+  renderDashboard();
+  fireEvent.change(screen.getByLabelText('Dashboard date'), { target: { value: '2026-11-18' } });
+  expect(mockState.analyticsParams).toEqual({ startDate: '2026-11-18', endDate: '2026-11-18' });
+  expect(mockState.salesParams).toMatchObject({ startDate: '2026-11-18', endDate: '2026-11-18' });
 });

@@ -7,7 +7,13 @@ import { can, normalizeRole, type Action } from './app/permissions';
 import { ProtectedRoute, RequirePermission } from './features/auth/ProtectedRoute';
 import { signedOut } from './features/auth/authSlice';
 import { RequireBusiness } from './features/business/RequireBusiness';
-import { api, useGetMyBusinessQuery } from './lib/api';
+import {
+  api,
+  useGetLowStockProductsQuery,
+  useGetMyBusinessQuery,
+  useGetSalesAnalyticsQuery,
+} from './lib/api';
+import { formatNaira } from './lib/formatters';
 
 const LoginPage = lazy(() =>
   import('./features/auth/LoginPage').then(({ LoginPage }) => ({ default: LoginPage })),
@@ -178,6 +184,12 @@ function AuthenticatedShell({ children, activeNav }: { children: ReactNode; acti
   const navigate = useNavigate();
   const user = useAppSelector((state) => state.auth.user);
   const { data: business } = useGetMyBusinessQuery();
+  const today = localDateKey(new Date());
+  const briefingAnalytics = useGetSalesAnalyticsQuery(
+    { startDate: today, endDate: today },
+    { skip: activeNav !== 'home' },
+  );
+  const briefingStock = useGetLowStockProductsQuery(undefined, { skip: activeNav !== 'home' });
   const fullName = user ? `${user.firstName} ${user.lastName}` : 'Trada user';
   const role = normalizeRole(user?.role ?? 'user');
   const aiActions = [
@@ -204,6 +216,26 @@ function AuthenticatedShell({ children, activeNav }: { children: ReactNode; acti
         ]
       : []),
   ];
+  const aiBriefing = activeNav === 'home'
+    ? {
+        title: 'Your business briefing',
+        summary: buildBusinessBriefing(
+          briefingAnalytics.data?.totalSalesCount,
+          briefingAnalytics.data?.totalRevenue,
+          briefingStock.data?.length,
+        ),
+        status:
+          briefingAnalytics.isError || briefingStock.isError
+            ? 'Partial recorded data'
+            : briefingAnalytics.isLoading || briefingStock.isLoading
+              ? 'Preparing briefing'
+              : 'From recorded data',
+        meta: `Today · ${new Intl.DateTimeFormat('en-NG', {
+          hour: 'numeric',
+          minute: '2-digit',
+        }).format(new Date())}`,
+      }
+    : undefined;
 
   function handleSignOut() {
     dispatch(signedOut());
@@ -218,6 +250,7 @@ function AuthenticatedShell({ children, activeNav }: { children: ReactNode; acti
       businessName={business?.name ?? 'Your business'}
       navigation={getMerchantNavigation(role)}
       aiActions={aiActions}
+      aiBriefing={aiBriefing}
       onNavigate={(href) => navigate(href)}
       onSignOut={handleSignOut}
       activeNav={activeNav}
@@ -230,4 +263,29 @@ function AuthenticatedShell({ children, activeNav }: { children: ReactNode; acti
 function OwnerDashboardContent() {
   const user = useAppSelector((state) => state.auth.user);
   return <OwnerDashboard firstName={user?.firstName ?? 'there'} />;
+}
+
+function buildBusinessBriefing(
+  saleCount: number | undefined,
+  revenue: number | undefined,
+  stockCount: number | undefined,
+) {
+  const salesSummary =
+    saleCount === undefined || revenue === undefined
+      ? 'Today’s sales summary is still loading or unavailable.'
+      : `${saleCount} ${saleCount === 1 ? 'sale' : 'sales'} worth ${formatNaira.format(revenue)} recorded today.`;
+  const stockSummary =
+    stockCount === undefined
+      ? 'Low-stock status is still loading or unavailable.'
+      : stockCount === 0
+        ? 'No products currently need restocking.'
+        : `${stockCount} ${stockCount === 1 ? 'product needs' : 'products need'} restocking.`;
+  return `${salesSummary} ${stockSummary}`;
+}
+
+function localDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }

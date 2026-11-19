@@ -29,6 +29,13 @@ export type AppShellAiAction = {
   description: string;
 };
 
+export type AppShellAiBriefing = {
+  meta?: string;
+  status?: string;
+  summary: string;
+  title: string;
+};
+
 const icons: Record<AppShellNavigationItem['icon'], LucideIcon> = {
   home: House,
   sales: ReceiptText,
@@ -59,6 +66,7 @@ type AppShellProps = {
   activeNav?: string;
   recordSaleHref?: string;
   aiActions?: AppShellAiAction[];
+  aiBriefing?: AppShellAiBriefing;
 };
 
 export function AppShell({
@@ -72,6 +80,7 @@ export function AppShell({
   activeNav = 'home',
   recordSaleHref,
   aiActions = [],
+  aiBriefing,
 }: AppShellProps) {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'ai' | 'more' | null>(null);
@@ -266,6 +275,19 @@ export function AppShell({
             </div>
             {mobilePanel === 'ai' ? (
               <>
+                {aiBriefing && (
+                  <section className="sd-ai-briefing" aria-labelledby="ai-briefing-title">
+                    <div className="sd-ai-briefing__title">
+                      <span><Sparkles aria-hidden="true" size={17} /></span>
+                      <div>
+                        <h3 id="ai-briefing-title">{aiBriefing.title}</h3>
+                        {aiBriefing.status && <small>{aiBriefing.status}</small>}
+                      </div>
+                    </div>
+                    <p>{aiBriefing.summary}</p>
+                    {aiBriefing.meta && <small className="sd-ai-briefing__meta">{aiBriefing.meta}</small>}
+                  </section>
+                )}
                 <p className="sd-mobile-panel__intro">
                   Voice results are drafts. You review and confirm every sale or product yourself.
                 </p>

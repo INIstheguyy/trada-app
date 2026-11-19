@@ -1,18 +1,19 @@
-import { Badge, Button, Surface } from '@trada/ui';
+import { Button, Surface } from '@trada/ui';
 import {
   AlertCircle,
   ArrowRight,
   Banknote,
   Box,
-  CheckCircle2,
-  CircleDollarSign,
+  CalendarDays,
+  ChartNoAxesColumnIncreasing,
+  ChevronDown,
   Clock3,
+  LoaderCircle,
   PackagePlus,
   ReceiptText,
   RefreshCw,
   ShoppingCart,
-  Sparkles,
-  WalletCards,
+  Store,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
@@ -24,34 +25,38 @@ import {
 } from '../../lib/api';
 import { formatNaira } from '../../lib/formatters';
 
-type DashboardPeriod = 'today' | '7days' | '30days';
+type DashboardPeriod = 'today' | '7days' | '14days' | '30days' | 'custom';
 
 type Metric = {
-  key: 'sales' | 'cash' | 'profit' | 'debt';
+  key: 'sales' | 'profit' | 'inventory' | 'debt';
   label: string;
   value: number | null;
-  note: string;
-  incomplete?: boolean;
 };
 
-const periodOptions: { value: DashboardPeriod; label: string }[] = [
-  { value: 'today', label: 'Today' },
-  { value: '7days', label: 'Last 7 days' },
-  { value: '30days', label: 'Last 30 days' },
+const periodOptions: { value: Exclude<DashboardPeriod, 'custom'>; label: string; days: number }[] = [
+  { value: 'today', label: 'Today', days: 1 },
+  { value: '7days', label: 'Last 7 days', days: 7 },
+  { value: '14days', label: 'Last 14 days', days: 14 },
+  { value: '30days', label: 'Last 30 days', days: 30 },
 ];
 
 const metricIcons: Record<Metric['key'], LucideIcon> = {
-  sales: ReceiptText,
-  cash: WalletCards,
-  profit: CircleDollarSign,
+  sales: ShoppingCart,
+  profit: ChartNoAxesColumnIncreasing,
+  inventory: Box,
   debt: Banknote,
 };
 
-export function OwnerDashboard({ firstName = 'Tola' }: { firstName?: string }) {
+export function OwnerDashboard({ firstName = 'there' }: { firstName?: string }) {
+  const today = new Date();
+  const todayKey = localDateKey(today);
   const [period, setPeriod] = useState<DashboardPeriod>('today');
-  const dateRange = getDateRange(period, new Date());
-  const periodLabel = periodOptions.find((option) => option.value === period)?.label ?? 'Today';
-  const periodContext = period === 'today' ? 'today' : `in the ${periodLabel.toLowerCase()}`;
+  const [selectedDate, setSelectedDate] = useState(todayKey);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [lowStockOpen, setLowStockOpen] = useState(false);
+  const dateRange = getDateRange(period, selectedDate);
+  const periodLabel = getPeriodLabel(period, selectedDate, todayKey);
+  const periodContext = getPeriodContext(period, selectedDate, todayKey);
   const analytics = useGetSalesAnalyticsQuery(dateRange);
   const lowStock = useGetLowStockProductsQuery();
   const recentSales = useGetSalesQuery({
@@ -75,260 +80,230 @@ export function OwnerDashboard({ firstName = 'Tola' }: { firstName?: string }) {
     void recentSales.refetch();
   }
 
+  function selectPeriod(nextPeriod: Exclude<DashboardPeriod, 'custom'>) {
+    setPeriod(nextPeriod);
+    setSelectedDate(todayKey);
+    setFilterOpen(false);
+  }
+
   if (isLoading) return <DashboardSkeleton />;
 
   const isFetching = analytics.isFetching || lowStock.isFetching || recentSales.isFetching;
   const metrics: Metric[] = [
     {
       key: 'sales',
-      label: period === 'today' ? 'Sales today' : `Sales — ${periodLabel.toLowerCase()}`,
+      label: period === 'today' ? "Today's sales" : 'Sales revenue',
       value: analytics.data?.totalRevenue ?? null,
-      note: analytics.data
-        ? `${analytics.data.totalSalesCount} recorded ${analytics.data.totalSalesCount === 1 ? 'sale' : 'sales'}`
-        : 'Sales analytics is temporarily unavailable',
-      incomplete: !analytics.data,
-    },
-    {
-      key: 'cash',
-      label: 'Cash received',
-      value: null,
-      note: 'Not provided by the current analytics contract',
-      incomplete: true,
     },
     {
       key: 'profit',
-      label: 'Gross profit',
+      label: period === 'today' ? "Today's gross profit" : 'Gross profit',
       value: analytics.data?.grossProfit ?? null,
-      note: analytics.data
-        ? 'Backend treatment of missing cost prices is not defined'
-        : 'Sales analytics is temporarily unavailable',
-      incomplete: true,
+    },
+    {
+      key: 'inventory',
+      label: 'Inventory value',
+      value: null,
     },
     {
       key: 'debt',
       label: 'Unpaid sale balance',
       value: analytics.data?.unpaidBalance ?? null,
-      note: analytics.data
-        ? 'This is not a verified customer debtor ledger'
-        : 'Sales analytics is temporarily unavailable',
-      incomplete: true,
     },
   ];
   const asOf = new Intl.DateTimeFormat('en-NG', {
     hour: 'numeric',
     minute: '2-digit',
   }).format(new Date());
-  const saleCount = analytics.data?.totalSalesCount;
   const stockCount = lowStock.data?.length;
 
   return (
-    <div className="dashboard">
-      <div className="dashboard__heading">
+    <div className="dashboard dashboard--reference">
+      <header className="dashboard__heading">
         <div>
-          <p className="eyebrow">Owner command centre</p>
-          <h1>Good afternoon, {firstName}</h1>
-          <p>See what needs your attention and what has been recorded.</p>
+          <h1>{getGreeting(today)}, {firstName} <span aria-hidden="true">👋</span></h1>
+          <p>Here&apos;s how your business is doing today.</p>
         </div>
-        <div className="dashboard-period" aria-label="Dashboard period">
-          {periodOptions.map((option) => (
-            <button
-              type="button"
-              key={option.value}
-              className={
-                option.value === period
-                  ? 'dashboard-period__button is-active'
-                  : 'dashboard-period__button'
-              }
-              aria-pressed={option.value === period}
-              onClick={() => setPeriod(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
 
-      <Surface className="briefing" aria-labelledby="briefing-title">
-        <div className="briefing__icon">
-          <Sparkles aria-hidden="true" size={22} />
-        </div>
-        <div className="briefing__content">
-          <div className="briefing__meta">
-            <h2 id="briefing-title">Your business briefing</h2>
-            <Badge className={hasPartialError ? 'sd-badge--warning' : ''}>
-              {hasPartialError ? (
-                <AlertCircle aria-hidden="true" size={14} />
-              ) : (
-                <CheckCircle2 aria-hidden="true" size={14} />
-              )}{' '}
-              {hasPartialError ? 'Partial data' : 'From recorded data'}
-            </Badge>
+        <div className="dashboard-heading-actions">
+          <div className={`dashboard-filter${filterOpen ? ' is-open' : ''}`}>
+            <button
+              className="dashboard-filter__trigger"
+              type="button"
+              aria-expanded={filterOpen}
+              aria-controls="dashboard-filter-panel"
+              onClick={() => setFilterOpen((open) => !open)}
+            >
+              <CalendarDays aria-hidden="true" size={18} />
+              <span>{periodLabel}</span>
+              <ChevronDown aria-hidden="true" size={16} />
+            </button>
+            <div className="dashboard-filter__panel" id="dashboard-filter-panel">
+              <label className="dashboard-date-picker">
+                <span>Date</span>
+                <input
+                  type="date"
+                  aria-label="Dashboard date"
+                  max={todayKey}
+                  value={selectedDate}
+                  onChange={(event) => {
+                    setSelectedDate(event.target.value || todayKey);
+                    setPeriod(event.target.value === todayKey ? 'today' : 'custom');
+                    setFilterOpen(false);
+                  }}
+                />
+              </label>
+              <div className="dashboard-filter__shortcuts" aria-label="Dashboard date ranges">
+                {periodOptions.slice(1).map((option) => (
+                  <button
+                    type="button"
+                    key={option.value}
+                    className={period === option.value ? 'is-active' : ''}
+                    aria-pressed={period === option.value}
+                    onClick={() => selectPeriod(option.value)}
+                  >
+                    {option.days} days
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-          <p>{buildBriefing(saleCount, analytics.data?.totalRevenue, stockCount, periodContext)}</p>
-          <span className="briefing__as-of">
-            Showing {periodLabel.toLowerCase()} · updated {asOf}
-          </span>
+          <button
+            className="icon-button dashboard-refresh"
+            type="button"
+            aria-label="Refresh dashboard"
+            onClick={refresh}
+          >
+            <RefreshCw aria-hidden="true" size={17} className={isFetching ? 'sd-spin' : ''} />
+          </button>
         </div>
-      </Surface>
+      </header>
 
       {hasPartialError && (
         <div className="dashboard-warning" role="status">
           <AlertCircle aria-hidden="true" size={17} />
-          <span>
-            Some dashboard information could not be loaded. Available figures are still shown.
-          </span>
-          <button type="button" onClick={refresh}>
-            Retry missing data
-          </button>
+          <span>Some dashboard information could not be loaded. Available figures are still shown.</span>
+          <button type="button" onClick={refresh}>Retry</button>
         </div>
       )}
 
-      <div className="dashboard-action-grid">
-        <Surface className="panel attention-panel">
-          <div className="panel__heading">
-            <div>
-              <p className="eyebrow">What needs attention</p>
-              <h2>Low-stock products</h2>
-              <p>Products at or below their restock threshold</p>
-            </div>
-            {lowStock.data && <span className="count-badge">{lowStock.data.length}</span>}
-          </div>
-          {lowStock.isLoading ? (
-            <PanelSkeleton />
-          ) : lowStock.isError || !lowStock.data ? (
-            <DashboardPanelError
-              message="Low-stock data is unavailable."
-              onRetry={() => void lowStock.refetch()}
-            />
-          ) : lowStock.data.length === 0 ? (
-            <DashboardEmpty icon={CheckCircle2} message="Stock levels look healthy right now." />
-          ) : (
-            <div className="attention-list">
-              {lowStock.data.slice(0, 3).map((product) => (
-                <article className="attention-item" key={product.id}>
-                  <span className="attention-item__icon attention-item__icon--high">
-                    <Box aria-hidden="true" size={19} />
-                  </span>
-                  <div>
-                    <h3>{product.name}</h3>
-                    <p>
-                      {product.quantity} {product.unit} left · threshold {product.stockThreshold}
-                    </p>
-                    <Link to={`/products/${product.id}`}>
-                      Review product <ArrowRight aria-hidden="true" size={15} />
-                    </Link>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-          {lowStock.data && lowStock.data.length > 3 && (
-            <Link className="panel__footer-action" to="/products">
-              Review all low-stock products <ArrowRight aria-hidden="true" size={15} />
-            </Link>
-          )}
-        </Surface>
-
-        <Surface className="panel next-actions-panel">
-          <div className="panel__heading">
-            <div>
-              <p className="eyebrow">Next actions</p>
-              <h2>Keep the business moving</h2>
-              <p>Continue with an available workflow</p>
-            </div>
-          </div>
-          <div className="next-actions-list">
-            <Link className="next-action next-action--primary" to="/sales/new">
-              <span className="next-action__icon">
-                <ShoppingCart aria-hidden="true" size={20} />
-              </span>
-              <span>
-                <strong>Record a sale</strong>
-                <small>Create a receipt and update stock</small>
-              </span>
-              <ArrowRight aria-hidden="true" size={17} />
-            </Link>
-            <Link className="next-action" to="/products/new">
-              <span className="next-action__icon">
-                <PackagePlus aria-hidden="true" size={20} />
-              </span>
-              <span>
-                <strong>Add a product</strong>
-                <small>Set its price, quantity and threshold</small>
-              </span>
-              <ArrowRight aria-hidden="true" size={17} />
-            </Link>
-            <Link className="next-action" to="/products">
-              <span className="next-action__icon">
-                <Box aria-hidden="true" size={20} />
-              </span>
-              <span>
-                <strong>Review inventory</strong>
-                <small>Check products and stock levels</small>
-              </span>
-              <ArrowRight aria-hidden="true" size={17} />
-            </Link>
-          </div>
-        </Surface>
-      </div>
-
-      <div className="section-heading">
-        <div>
-          <h2>Business snapshot</h2>
-          <p>
-            {periodLabel} · updated {asOf}
-          </p>
-        </div>
-        <button
-          className="icon-button"
-          type="button"
-          aria-label="Refresh dashboard"
-          onClick={refresh}
-        >
-          <RefreshCw aria-hidden="true" size={17} className={isFetching ? 'sd-spin' : ''} />
-        </button>
-      </div>
-      <div className="metrics-grid">
+      <section className="metrics-grid" aria-label={`Business summary for ${periodLabel}`}>
         {metrics.map((metric) => {
           const Icon = metricIcons[metric.key];
           return (
-            <Surface className="metric-card" key={metric.key}>
-              <div className="metric-card__top">
-                <span className={`metric-card__icon metric-card__icon--${metric.key}`}>
-                  <Icon aria-hidden="true" size={20} />
-                </span>
-                {metric.incomplete && (
-                  <Badge className="sd-badge--warning">
-                    <AlertCircle aria-hidden="true" size={13} /> Qualified
-                  </Badge>
+            <Surface className={`metric-card metric-card--${metric.key}`} key={metric.key}>
+              <span className={`metric-card__icon metric-card__icon--${metric.key}`}>
+                <Icon aria-hidden="true" size={22} />
+              </span>
+              <div>
+                <p className="metric-card__label">{metric.label}</p>
+                {metric.value === null ? (
+                  <strong className="metric-card__placeholder" aria-label="Data unavailable">—</strong>
+                ) : (
+                  <strong className="metric-card__value">{formatNaira.format(metric.value)}</strong>
                 )}
               </div>
-              <p className="metric-card__label">{metric.label}</p>
-              <strong className="metric-card__value">
-                {metric.value === null ? 'Unavailable' : formatNaira.format(metric.value)}
-              </strong>
-              <p
-                className={
-                  metric.incomplete
-                    ? 'metric-card__note metric-card__note--warning'
-                    : 'metric-card__note'
-                }
-              >
-                {metric.note}
-              </p>
             </Surface>
           );
         })}
+      </section>
+
+      <div className="dashboard-middle">
+      <section className="dashboard-quick-section" aria-labelledby="quick-actions-title">
+        <div className="dashboard-section-title">
+          <div>
+            <p className="eyebrow">Available now</p>
+            <h2 id="quick-actions-title">Quick actions</h2>
+          </div>
+        </div>
+        <div className="dashboard-quick-grid">
+          <QuickAction icon={ReceiptText} label="Record sale" to="/sales/new" />
+          <QuickAction icon={PackagePlus} label="Add product" to="/products/new" />
+          <QuickAction icon={Box} label="Inventory" to="/products" />
+          <button
+            className={`dashboard-quick-action${lowStockOpen ? ' is-active' : ''}`}
+            type="button"
+            aria-expanded={lowStockOpen}
+            aria-controls="dashboard-low-stock"
+            onClick={() => setLowStockOpen((open) => !open)}
+          >
+            <span className="dashboard-quick-action__icon">
+              <AlertCircle aria-hidden="true" size={23} />
+              <small>{stockCount ?? '—'}</small>
+            </span>
+            <strong>Low stock</strong>
+          </button>
+        </div>
+
+        {lowStockOpen && (
+          <Surface className="dashboard-low-stock" id="dashboard-low-stock">
+            <div className="panel__heading">
+              <div>
+                <h3>Low-stock products</h3>
+                <p>Products at or below their restock threshold</p>
+              </div>
+              {stockCount !== undefined && <span className="count-badge">{stockCount}</span>}
+            </div>
+            {lowStock.isLoading ? (
+              <PanelSkeleton />
+            ) : lowStock.isError || !lowStock.data ? (
+              <DashboardPanelError
+                message="Low-stock data is unavailable."
+                onRetry={() => void lowStock.refetch()}
+              />
+            ) : lowStock.data.length === 0 ? (
+              <DashboardEmpty icon={Box} message="Stock levels look healthy right now." />
+            ) : (
+              <div className="attention-list">
+                {lowStock.data.slice(0, 3).map((product) => (
+                  <article className="attention-item" key={product.id}>
+                    <span className="attention-item__icon attention-item__icon--medium">
+                      <Box aria-hidden="true" size={19} />
+                    </span>
+                    <div>
+                      <h3>{product.name}</h3>
+                      <p>{product.quantity} {product.unit} left · threshold {product.stockThreshold}</p>
+                      <Link to={`/products/${product.id}`}>
+                        Review product <ArrowRight aria-hidden="true" size={15} />
+                      </Link>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+            {lowStock.data && lowStock.data.length > 3 && (
+              <Link className="panel__footer-action" to="/products">
+                Review all low-stock products <ArrowRight aria-hidden="true" size={15} />
+              </Link>
+            )}
+          </Surface>
+        )}
+      </section>
+
+      <section className="store-feature-preview" aria-labelledby="store-preview-title">
+        <div className="store-feature-preview__art" aria-hidden="true">
+          <Store size={38} />
+          <ShoppingCart size={19} />
+        </div>
+        <div className="store-feature-preview__copy">
+          <span className="store-feature-preview__status">
+            <LoaderCircle className="sd-spin" aria-hidden="true" size={14} /> In development
+          </span>
+          <h2 id="store-preview-title">Share your store</h2>
+          <p>Your BNPL-powered online storefront is being prepared.</p>
+        </div>
+        <button type="button" disabled>Coming soon</button>
+      </section>
       </div>
 
-      <Surface className="panel sales-panel">
+      <Surface className="panel sales-panel dashboard-transactions">
         <div className="panel__heading">
           <div>
-            <h2>Recent sales</h2>
-            <p>Latest records {periodContext}</p>
+            <h2>Recent transactions</h2>
+            <p>{periodContext}</p>
           </div>
           <Link className="text-action" to="/sales">
-            View all
+            View all <ArrowRight aria-hidden="true" size={15} />
           </Link>
         </div>
         {recentSales.isLoading ? (
@@ -343,24 +318,15 @@ export function OwnerDashboard({ firstName = 'Tola' }: { firstName?: string }) {
         ) : (
           <div className="product-list">
             {recentSales.data.sales.map((sale) => (
-              <Link
-                className="product-row dashboard-sale-row"
-                key={sale.id}
-                to={`/sales/${sale.id}`}
-              >
-                <span className="product-rank">
-                  <ReceiptText aria-hidden="true" size={15} />
-                </span>
+              <Link className="product-row dashboard-sale-row" key={sale.id} to={`/sales/${sale.id}`}>
+                <span className="product-rank"><ShoppingCart aria-hidden="true" size={15} /></span>
                 <div className="product-row__main">
-                  <h3>{sale.receiptNumber}</h3>
-                  <p>
-                    {sale.customerName || 'Walk-in customer'} ·{' '}
-                    {sale.paymentStatus.replace('_', ' ')}
-                  </p>
+                  <h3>{sale.items[0]?.productName ?? sale.receiptNumber}</h3>
+                  <p>{formatSaleSummary(sale.items.length, sale.receiptNumber, sale.paymentStatus)}</p>
                 </div>
                 <div className="product-row__value">
                   <strong>{formatNaira.format(sale.totalAmount)}</strong>
-                  <span>{formatTime(sale.createdAt)}</span>
+                  <span>{formatTransactionDate(sale.createdAt, todayKey)}</span>
                 </div>
               </Link>
             ))}
@@ -369,10 +335,19 @@ export function OwnerDashboard({ firstName = 'Tola' }: { firstName?: string }) {
       </Surface>
 
       <p className="dashboard__footnote">
-        <Clock3 aria-hidden="true" size={14} /> Figures reflect backend records fetched at {asOf}.
-        Sales revenue, cash received, profit and unpaid balances are not treated as interchangeable.
+        <Clock3 aria-hidden="true" size={14} /> Updated {asOf}. Revenue, gross profit and unpaid
+        balances use the backend analytics model; inventory value is not yet available.
       </p>
     </div>
+  );
+}
+
+function QuickAction({ icon: Icon, label, to }: { icon: LucideIcon; label: string; to: string }) {
+  return (
+    <Link className="dashboard-quick-action" to={to}>
+      <span className="dashboard-quick-action__icon"><Icon aria-hidden="true" size={23} /></span>
+      <strong>{label}</strong>
+    </Link>
   );
 }
 
@@ -387,14 +362,12 @@ function DashboardEmpty({ icon: Icon, message }: { icon: LucideIcon; message: st
 
 function DashboardSkeleton() {
   return (
-    <div className="dashboard" aria-busy="true" aria-label="Loading dashboard">
+    <div className="dashboard dashboard--reference" aria-busy="true" aria-label="Loading dashboard">
       <div className="skeleton skeleton--title" />
-      <div className="skeleton skeleton--briefing" />
       <div className="metrics-grid">
-        {[1, 2, 3, 4].map((number) => (
-          <div className="skeleton skeleton--metric" key={number} />
-        ))}
+        {[1, 2, 3, 4].map((number) => <div className="skeleton skeleton--metric" key={number} />)}
       </div>
+      <div className="skeleton skeleton--briefing" />
     </div>
   );
 }
@@ -404,9 +377,7 @@ function DashboardPanelError({ message, onRetry }: { message: string; onRetry: (
     <div className="dashboard-panel-error" role="alert">
       <AlertCircle aria-hidden="true" size={22} />
       <p>{message}</p>
-      <Button variant="secondary" onClick={onRetry}>
-        Try again
-      </Button>
+      <Button variant="secondary" onClick={onRetry}>Try again</Button>
     </div>
   );
 }
@@ -415,33 +386,43 @@ function PanelSkeleton() {
   return <div className="skeleton dashboard-panel-skeleton" aria-label="Loading panel" />;
 }
 
-function buildBriefing(
-  saleCount: number | undefined,
-  revenue: number | undefined,
-  stockCount: number | undefined,
-  periodContext: string,
-) {
-  const parts: string[] = [];
-  if (saleCount !== undefined && revenue !== undefined)
-    parts.push(
-      `${saleCount} ${saleCount === 1 ? 'sale' : 'sales'} worth ${formatNaira.format(revenue)} recorded ${periodContext}.`,
-    );
-  else parts.push(`The sales summary ${periodContext} is temporarily unavailable.`);
-  if (stockCount !== undefined)
-    parts.push(
-      stockCount === 0
-        ? 'No products currently need restocking.'
-        : `${stockCount} ${stockCount === 1 ? 'product needs' : 'products need'} restocking.`,
-    );
-  else parts.push('Low-stock status is temporarily unavailable.');
-  return parts.join(' ');
+function getGreeting(date: Date) {
+  const hour = date.getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
 }
 
-function getDateRange(period: DashboardPeriod, endDate: Date) {
+function getDateRange(period: DashboardPeriod, endDateKey: string) {
+  const endDate = new Date(`${endDateKey}T12:00:00`);
   const startDate = new Date(endDate);
-  if (period === '7days') startDate.setDate(startDate.getDate() - 6);
-  if (period === '30days') startDate.setDate(startDate.getDate() - 29);
+  const option = periodOptions.find((item) => item.value === period);
+  const dayCount = option?.days ?? 1;
+  startDate.setDate(startDate.getDate() - (dayCount - 1));
   return { startDate: localDateKey(startDate), endDate: localDateKey(endDate) };
+}
+
+function getPeriodLabel(period: DashboardPeriod, selectedDate: string, todayKey: string) {
+  if (period === 'today' || period === 'custom') return formatDateLabel(selectedDate, todayKey);
+  return periodOptions.find((option) => option.value === period)?.label ?? 'Today';
+}
+
+function getPeriodContext(period: DashboardPeriod, selectedDate: string, todayKey: string) {
+  if (period === 'today') return 'today';
+  if (period === 'custom') return `on ${formatDateLabel(selectedDate, todayKey)}`;
+  const label = periodOptions.find((option) => option.value === period)?.label ?? 'Today';
+  return `in the ${label.toLowerCase()}`;
+}
+
+function formatDateLabel(value: string, todayKey: string) {
+  if (value === todayKey) {
+    return new Intl.DateTimeFormat('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }).format(
+      new Date(`${value}T12:00:00`),
+    );
+  }
+  return new Intl.DateTimeFormat('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }).format(
+    new Date(`${value}T12:00:00`),
+  );
 }
 
 function localDateKey(date: Date) {
@@ -451,8 +432,15 @@ function localDateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function formatTime(value: string) {
-  return new Intl.DateTimeFormat('en-NG', { hour: 'numeric', minute: '2-digit' }).format(
-    new Date(value),
-  );
+function formatSaleSummary(itemCount: number, receiptNumber: string, paymentStatus: string) {
+  const itemLabel = `${itemCount} ${itemCount === 1 ? 'item' : 'items'}`;
+  return `${receiptNumber} · ${itemLabel} · ${paymentStatus.replace('_', ' ')}`;
+}
+
+function formatTransactionDate(value: string, todayKey: string) {
+  const date = new Date(value);
+  const dateKey = localDateKey(date);
+  const time = new Intl.DateTimeFormat('en-NG', { hour: 'numeric', minute: '2-digit' }).format(date);
+  if (dateKey === todayKey) return `Today, ${time}`;
+  return new Intl.DateTimeFormat('en-NG', { day: 'numeric', month: 'short' }).format(date);
 }

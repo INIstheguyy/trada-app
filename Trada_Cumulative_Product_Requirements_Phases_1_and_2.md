@@ -1101,7 +1101,7 @@ These items require clarification before the frontend treats the backend as the 
 
 **Limitation:** No automated visual regression test exists; manual review of the running dev server is recommended to confirm rendering. The dist build has not been regenerated.
 
-**New product decision recorded:** The product's visible brand identity is now **Trada.com.ng** with the tagline **Manage · Sell · Grow**. This supersedes any prior "SabiDesk" references that remain in legacy file names. File renames (e.g., `SabiDesk_*.md`) are a housekeeping task, not an urgent delivery requirement.
+**New product decision recorded:** The product's visible brand identity is **Trada.com.ng** with the tagline **Manage · Sell · Grow**. The legacy document filename migration to the `Trada_` prefix was completed on 19 November 2026.
 
 **Next session target:** Perform the live authentication, product and sales handshake when the backend is available; or proceed to the next domain with a received backend contract.
 
@@ -1772,7 +1772,7 @@ These items require clarification before the frontend treats the backend as the 
 **Delivery and documentation risks:**
 
 - Literal screenshot replication would expose unsupported claims and could misstate financial data; implementation must follow the element dispositions in the new plan.
-- The repository instructions refer to `Trada_Cumulative_Product_Requirements_Phases_1_and_2.md` and `Trada_API_Requests_and_Responses.md`, while the actual tracked files are currently named with the `SabiDesk_` prefix. Their contents refer to Trada. Resolve this source-of-truth naming conflict through an explicit rename/migration after protecting current uncommitted edits.
+- Resolved on 19 November 2026: the tracked product-requirements and backend-contract documents now use the `Trada_` prefix required by the repository instructions. The prior source-of-truth filename conflict is closed.
 - Product images are absent from the current schema, and the supplied raster logo still needs a production transparent/vector source for faithful shell treatment.
 
 **Verification:** Read-only audit of the three supplied images, current feature components, responsive CSS, shared shell/navigation, capability registry, API schemas, architecture, PRD, backend contract and existing focused tests. No application code or runtime behavior changed; automated test execution was not required for this documentation-only plan.
@@ -2000,3 +2000,183 @@ These items require clarification before the frontend treats the backend as the 
 **Verification:** ESLint, TypeScript, focused authentication tests and the production PWA build were run after integration.
 
 **Boundary:** The sheet only follows downward gestures and closes after a bounded distance threshold. Authentication requests, field validation, redirects and RBAC behavior are unchanged.
+
+### Session 043 — Shared password visibility and form focus refinement
+
+**Date:** 19 November 2026
+**Outcome:** Standardised password visibility controls through the shared UI package and simplified focused form-field styling.
+
+**Completed:**
+
+- Confirmed that project forms use shared `FormField`, `Input`, `Select` and `Textarea` primitives from `@trada/ui`.
+- Added a reusable `PasswordInput` primitive with accessible show/hide labels, pressed state and eye icon feedback.
+- Integrated the shared password control into login, registration password and registration confirmation fields while retaining autocomplete, minimum length and required attributes.
+- Removed the shared input/select/textarea focus shadow so focused fields use the existing border without an additional outer ring.
+- Added authentication regression coverage for toggling a password between concealed and visible states.
+
+**Verification:** ESLint, TypeScript, focused authentication tests and the production PWA build were run after integration.
+
+**Boundary:** Password visibility is local presentation state only. Password values, validation, browser autocomplete and API request payloads are unchanged.
+
+### Session 044 — Responsive two-stage business onboarding
+
+**Date:** 19 November 2026
+**Outcome:** Brought business onboarding into the authentication visual flow and reduced mobile/tablet form density with a guided two-stage setup.
+
+**Completed:**
+
+- Reused the authentication split-page presentation on desktop and its draggable bottom-sheet reveal on tablet and mobile.
+- Added a “Set up your business” story action that opens the onboarding form while keeping Trada branding visible above the 80-percent-height sheet.
+- Split tablet/mobile onboarding into two stages: business name and description first; category, working currency and industry second.
+- Added first-stage completion validation, responsive progress feedback, forward navigation and a back action that preserves entered values.
+- Kept both onboarding sections visible together on desktop, where the right-side panel remains independently scrollable.
+- Removed the signup password-security footer and both duplicated onboarding privacy notices from the bottom of their respective experiences.
+
+**Verification:** ESLint, TypeScript, focused authentication and business-onboarding tests, and the production PWA build were run after integration.
+
+**Boundary:** The business creation request contract is unchanged. The frontend still submits name, description, category, currency and industry only after explicit final confirmation.
+
+### Session 045 — Two-stage onboarding across every breakpoint
+
+**Date:** 19 November 2026
+**Outcome:** Extended the guided onboarding sequence to desktop so every device follows the same two-step business setup model.
+
+**Completed:**
+
+- Changed desktop onboarding from a combined long form to the same sequential stages used on tablet and mobile.
+- Stage one now exclusively collects business name and description; stage two collects category, currency and industry.
+- Made Continue, Back, progress state and first-stage validation consistent across all breakpoints.
+- Retained the desktop split-page shell and independently scrollable right-side panel.
+
+**Verification:** ESLint, TypeScript, focused onboarding tests and the production PWA build were run after integration.
+
+**Boundary:** This is a presentation and client-state change only. The final business creation payload and endpoint remain unchanged.
+
+### Session 046 — Reference-led dashboard overhaul
+
+**Date:** 19 November 2026
+**Outcome:** Rebuilt the owner dashboard around the approved mobile reference while preserving strict boundaries between live backend data, unavailable aggregates and future product capabilities.
+
+**Data-model review:**
+
+- Confirmed that `GET /sales` supplies item-level transaction records, amount paid, balance due, payment status and creation timestamps.
+- Confirmed that `GET /sales/reports/analytics` is the source of truth for total sales count, revenue, gross profit and unpaid sale balance across a requested inclusive date range.
+- Confirmed that `GET /products/alerts/low-stock` supplies the live low-stock notification count and expandable product details.
+- Confirmed that the reported 19 November “Today” empty state is consistent with the supplied records, whose newest `createdAt` values are dated 18 November. A `304 Not Modified` response is a valid browser-cache response and not the source of the empty data.
+- Kept inventory value unavailable because no trustworthy aggregate contract currently supplies it. The dashboard does not estimate this value from a partial product page.
+
+**Completed:**
+
+- Added time-aware morning, afternoon and evening greetings and adopted the reference subtitle.
+- Replaced the fixed period tabs with a mobile collapsible calendar/range control and desktop inline controls for a selected date plus 7, 14 and 30-day ranges.
+- Simplified summary cards to icon, label and value only; removed qualification badges and warning copy, and added an animated dash for unavailable values.
+- Replaced the standalone low-stock and next-action cards with a reference-led Quick Actions grid. Low stock now carries a live count badge and toggles its detail panel.
+- Added a visually distinct Share Store and BNPL preview with an explicit in-development loading state and disabled “Coming soon” action.
+- Renamed the sales list to Recent Transactions and used sale item names while retaining receipt, payment status, amount and timestamp context.
+- Removed the dashboard briefing card and added the recorded-data briefing to the central AI modal alongside the existing draft-safe voice actions.
+- Added focused dashboard and shell regression coverage for date-range queries, unavailable metric states, low-stock disclosure, future-feature boundaries and AI briefing placement.
+
+**Verification:** ESLint and TypeScript checks passed. Focused dashboard and AppShell coverage passed: 8 tests across 2 files. The production PWA build passed with 36 precache entries, and diff hygiene passed.
+
+**Visual QA limitation:** Responsive behavior is implemented for the compact filter, metric grid, quick-action disclosure and Store/BNPL preview, but browser-level visual inspection at phone, tablet and desktop widths is not claimed in this session and remains a manual acceptance step.
+
+**Boundary:** Share Store, BNPL, inventory valuation, invoice creation and a verified debtor ledger remain unavailable. The dashboard does not expose them as working actions or infer unsupported figures.
+
+### Session 047 — Dashboard visual hierarchy correction
+
+**Date:** 19 November 2026
+**Outcome:** Corrected the dashboard composition so the greeting and financial summary remain at the top, Quick Actions and the Store/BNPL preview form the middle content band, and recent transactions follow below.
+
+**Completed:**
+
+- Identified a legacy dashboard `order` rule that could place unordered reference-dashboard sections ahead of the greeting and summary despite their correct source order.
+- Scoped a final order reset to the reference dashboard so its semantic document order remains authoritative without changing older dashboard variants.
+- Grouped Quick Actions and the Store/BNPL preview into a responsive middle grid: stacked on compact screens and presented side-by-side from desktop widths.
+- Added regression coverage confirming the greeting precedes the summary and that both middle modules share the same layout group.
+
+**Verification:** ESLint and TypeScript checks passed. Focused dashboard coverage passed: 6 tests in 1 file. Diff hygiene passed.
+
+**Boundary:** This session changes dashboard layout only. It does not activate Store, BNPL or any new backend capability.
+
+### Session 048 — Dashboard reference-order fidelity
+
+**Date:** 19 November 2026
+**Outcome:** Corrected the responsive dashboard composition to follow the approved reference image as one continuous vertical hierarchy at every breakpoint.
+
+**Reference mapping:**
+
+1. Greeting and date control.
+2. Two-by-two business summary.
+3. Quick Actions row.
+4. Full-width Store/BNPL banner.
+5. Full-width Recent Transactions panel.
+
+**Completed:**
+
+- Removed the desktop-only side-by-side treatment of Quick Actions and the Store/BNPL banner.
+- Kept both middle modules in their reference order and at full available width on mobile, tablet and desktop.
+- Preserved capability-safe content: unsupported invoice, debtor, live storefront and BNPL actions are not presented as operational features merely to copy the concept image.
+
+**Verification:** ESLint, TypeScript, focused dashboard coverage and diff hygiene passed.
+
+**Boundary:** This is a visual-order correction only. Existing live data mappings, route permissions and future-feature restrictions remain unchanged.
+
+### Session 049 — Localhost-verified dashboard order fix
+
+**Date:** 19 November 2026
+**Outcome:** Fixed the CSS cascade that still placed Quick Actions and Store/BNPL ahead of the summary in the real localhost render, then verified the final hierarchy in headless Chrome against `localhost:5173`.
+
+**Root cause:**
+
+- Legacy dashboard rules assigned explicit order values to the heading, metrics, action grid, warning, sales panel and footnote.
+- The first reference-dashboard reset did not override the two-class metrics selector because its selector specificity was lower, so component source order and DOM-level tests did not match the browser layout.
+
+**Completed:**
+
+- Removed the obsolete dashboard order declarations so the semantic component order is also the rendered grid order.
+- Verified the stylesheet served by the active Vite development server rather than relying only on the source file.
+- Rendered the real dashboard component on a temporary contract-valid localhost harness and captured it in a clean Chrome profile at 744 × 1200 pixels.
+- Visually confirmed the final sequence: greeting and date filter, summary grid, Quick Actions, Store/BNPL banner, Recent Transactions.
+- Removed the temporary visual harness after verification; no test-only route or fixture remains in the application.
+
+**Verification:** Localhost browser capture passed at 744 × 1200 pixels. ESLint, TypeScript, focused dashboard coverage and diff hygiene passed.
+
+**Boundary:** The browser fixture was used only to verify layout and was removed immediately afterward. Production API behavior and authentication state were not changed.
+
+### Session 050 — Reference-led sales activity simplification
+
+**Date:** 19 November 2026
+**Outcome:** Reworked the sales activity module around the approved reference’s copy and compact information hierarchy while retaining the existing live analytics, filters, pagination and sale-detail routes.
+
+**Completed:**
+
+- Replaced the prior hero with the exact reference text: “Sales” and “Record sales, view performance and track revenue.”
+- Reduced each sales summary card to its metric title and primary figure. Removed icons, qualification badges and explanatory notes from the card surface.
+- Preserved financially explicit metric names: Recorded sales, Booked revenue, Gross profit and Unpaid sale balance.
+- Replaced the dense receipt table with a compact sales list showing product and quantity, transaction timestamp, payment method and total amount only.
+- Kept receipt numbers available in the detail-link accessible name while removing them and the separate received, balance, payment-status and sale-status fields from the visual list.
+- Used the first sold item as the row label, included its quantity when greater than one, and indicated additional item lines without inventing a summary product.
+- Retained the complete receipt, payment and balance breakdown on the existing sale-detail route.
+- Corrected list semantics to `ul > li > a`, preserving both list structure and keyboard-accessible navigation.
+
+**Verification:** ESLint and TypeScript checks passed. Focused sales-list coverage passed: 3 tests in 1 file. A contract-valid localhost render was inspected in Chrome with an emulated 390 × 1200 mobile viewport; `innerWidth`, `clientWidth` and `scrollWidth` all measured 390 pixels. Diff hygiene passed.
+
+**Boundary:** The redesign changes presentation only. Analytics meanings, backend queries, supported filters, pagination, RBAC and sale-detail data remain unchanged.
+### Session 051 — Collapsible sales filters and centered controls
+
+- Consolidated `Record sale`, `Voice sale`, and `Filter` into a centered sales toolbar directly beneath the page heading.
+- Collapsed the receipt, payment, status, and date filters by default behind an accessible toggle with explicit expanded state.
+- Kept active-filter visibility through a toolbar status indicator while preserving clear and refresh controls in the results region.
+- Grouped the `From` and `To` date inputs into a single responsive flex row on mobile and desktop.
+- Reduced the mobile filter trigger to an accessible icon control so the centered three-control toolbar stays within the viewport.
+- Stacked each date label above its native date input within the shared row so mobile date values and picker controls remain legible.
+- Added focused coverage for the collapsed default state, toggle behavior, and submitted filter contract.
+
+### Session 052 — Inventory filter and action-toolbar parity
+
+- Applied the Sales control pattern to Inventory with a centered `Add product`, `Voice product`, and `Filter` toolbar.
+- Connected `Voice product` to the existing `/products/new?ai=voice` workflow without introducing a new backend capability.
+- Collapsed product search, type, and active-status filters behind an accessible toggle with explicit expanded state.
+- Preserved the existing product-query contract and moved clear and refresh controls into the results row.
+- Added the same active-filter indicator and compact mobile filter trigger used by Sales to prevent horizontal overflow.
+- Added focused coverage for collapsed filter behavior, query submission, and toolbar destinations.

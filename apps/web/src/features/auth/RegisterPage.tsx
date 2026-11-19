@@ -1,4 +1,4 @@
-import { Alert, Button, FormField, Input } from '@trada/ui';
+import { Alert, Button, FormField, Input, PasswordInput } from '@trada/ui';
 import { CircleAlert } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
@@ -58,7 +58,6 @@ export function RegisterPage() {
         label: 'Sign in',
         to: '/login',
       }}
-      trustMessage="Your password is transmitted securely and is never displayed back to you."
     >
       <AuthHeading
         eyebrow="Get started"
@@ -176,15 +175,26 @@ function AccountField({
 }: AccountFieldProps) {
   return (
     <FormField htmlFor={id} label={label} hint={hint}>
-      <Input
-        {...input}
-        id={id}
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        aria-describedby={hint ? `${id}-hint` : undefined}
-        required
-      />
+      {type === 'password' ? (
+        <PasswordInput
+          {...input}
+          id={id}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          aria-describedby={hint ? `${id}-hint` : undefined}
+          required
+        />
+      ) : (
+        <Input
+          {...input}
+          id={id}
+          type={type}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          aria-describedby={hint ? `${id}-hint` : undefined}
+          required
+        />
+      )}
     </FormField>
   );
 }

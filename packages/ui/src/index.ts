@@ -3,6 +3,7 @@ export { Button } from './primitives/Button';
 export { Alert } from './primitives/Alert';
 export { FormField } from './primitives/FormField';
 export { Input } from './primitives/Input';
+export { PasswordInput } from './primitives/PasswordInput';
 export { Select } from './primitives/Select';
 export { Surface } from './primitives/Surface';
 export { Textarea } from './primitives/Textarea';
@@ -11,4 +12,8 @@ export { PageHeader } from './patterns/PageHeader';
 export { BrandLogo } from './patterns/BrandLogo';
 export { StatCard } from './patterns/StatCard';
 export { AppShell } from './layouts/AppShell';
-export type { AppShellNavigationItem } from './layouts/AppShell';
+export type {
+  AppShellAiAction,
+  AppShellAiBriefing,
+  AppShellNavigationItem,
+} from './layouts/AppShell';

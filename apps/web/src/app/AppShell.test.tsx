@@ -65,6 +65,12 @@ test('opens the central AI voice launcher and routes only to draft-safe workflow
           icon: 'inventory',
         },
       ]}
+      aiBriefing={{
+        title: 'Your business briefing',
+        summary: 'Two sales were recorded today. One product needs restocking.',
+        status: 'From recorded data',
+        meta: 'Today · 9:41 AM',
+      }}
     >
       <p>Workspace</p>
     </AppShell>,
@@ -72,6 +78,8 @@ test('opens the central AI voice launcher and routes only to draft-safe workflow
 
   fireEvent.click(screen.getByRole('button', { name: 'Open AI voice assistant' }));
   expect(screen.getByRole('dialog')).toHaveTextContent('What would you like to capture?');
+  expect(screen.getByRole('dialog')).toHaveTextContent('Your business briefing');
+  expect(screen.getByRole('dialog')).toHaveTextContent('Two sales were recorded today.');
   expect(screen.getByText('Voice results are drafts. You review and confirm every sale or product yourself.')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('link', { name: /Record a sale by voice/ }));

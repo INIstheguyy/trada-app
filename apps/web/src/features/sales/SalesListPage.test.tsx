@@ -17,12 +17,39 @@ vi.mock('../../lib/api', async (importOriginal) => {
       return {
         ...base,
         data: {
-          sales: [],
+          sales: [
+            {
+              id: 'sale-1',
+              receiptNumber: 'TRD-20261119-001',
+              customerName: null,
+              subtotal: 4000,
+              discountAmount: 0,
+              taxAmount: 0,
+              totalAmount: 4000,
+              amountPaid: 4000,
+              balanceDue: 0,
+              paymentMethod: 'cash' as const,
+              paymentStatus: 'paid' as const,
+              status: 'completed' as const,
+              items: [
+                {
+                  id: 'item-1',
+                  productId: 'product-1',
+                  productName: 'Spanner',
+                  unitPrice: 1000,
+                  quantity: 4,
+                  discountAmount: 0,
+                  total: 4000,
+                },
+              ],
+              createdAt: '2026-11-19T09:28:00.000Z',
+            },
+          ],
           pagination: {
-            total: 0,
+            total: 1,
             page: 1,
             limit: 10,
-            totalPages: 0,
+            totalPages: 1,
             hasNextPage: false,
             hasPrevPage: false,
           },
@@ -49,17 +76,39 @@ afterEach(() => {
   mockState.params = undefined;
 });
 
-test('keeps sales financial meanings qualified and distinct', () => {
+test('uses the reference hero and keeps summary cards to title and value only', () => {
   render(
     <MemoryRouter>
       <SalesListPage />
     </MemoryRouter>,
   );
+  expect(screen.getByRole('heading', { name: 'Sales' })).toBeInTheDocument();
+  expect(screen.getByText('Record sales, view performance and track revenue.')).toBeInTheDocument();
+  expect(screen.queryByText('Sales activity')).not.toBeInTheDocument();
+  expect(screen.getByText('Recorded sales')).toBeInTheDocument();
   expect(screen.getByText('Booked revenue')).toBeInTheDocument();
   expect(screen.getByText('Gross profit')).toBeInTheDocument();
   expect(screen.getByText('Unpaid sale balance')).toBeInTheDocument();
-  expect(screen.getByText('Not a verified customer debtor ledger')).toBeInTheDocument();
-  expect(screen.getAllByText('Qualified')).toHaveLength(2);
+  expect(screen.queryByText('Not a verified customer debtor ledger')).not.toBeInTheDocument();
+  expect(screen.queryByText('Qualified')).not.toBeInTheDocument();
+});
+
+test('presents each sale as a compact product, time, payment-method and total row', () => {
+  render(
+    <MemoryRouter>
+      <SalesListPage />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText('Spanner (x4)')).toBeInTheDocument();
+  expect(screen.getByText('Cash')).toBeInTheDocument();
+  expect(screen.getByText('₦4,000')).toBeInTheDocument();
+  expect(screen.queryByText('Received')).not.toBeInTheDocument();
+  expect(screen.queryByText('Balance')).not.toBeInTheDocument();
+  expect(screen.queryByText('TRD-20261119-001')).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'View TRD-20261119-001' })).toHaveAttribute(
+    'href',
+    '/sales/sale-1',
+  );
 });
 
 test('sends supported receipt, payment, sale-status and date filters', () => {
@@ -68,6 +117,11 @@ test('sends supported receipt, payment, sale-status and date filters', () => {
       <SalesListPage />
     </MemoryRouter>,
   );
+  expect(screen.queryByRole('search')).not.toBeInTheDocument();
+  const filterToggle = screen.getByRole('button', { name: 'Filter' });
+  expect(filterToggle).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(filterToggle);
+  expect(filterToggle).toHaveAttribute('aria-expanded', 'true');
   fireEvent.change(screen.getByLabelText('Search sales'), { target: { value: 'TR-100' } });
   fireEvent.change(screen.getByLabelText('Payment status'), { target: { value: 'unpaid' } });
   fireEvent.change(screen.getByLabelText('Sale status'), { target: { value: 'completed' } });

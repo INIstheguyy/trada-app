@@ -5,11 +5,9 @@ import {
   ArrowRight,
   Boxes,
   ChevronDown,
-  CircleDollarSign,
   Mic,
   PackagePlus,
   RefreshCw,
-  Repeat2,
   Search,
   SlidersHorizontal,
 } from 'lucide-react';
@@ -113,32 +111,15 @@ export function ProductListPage() {
 
       <div className="inventory-summary" aria-label="Inventory summary">
         <InventoryMetric
-          icon={Boxes}
           label="Total products"
-          value={data ? String(data.pagination.total) : 'Unavailable'}
-          note="Across your product catalogue"
+          value={data ? String(data.pagination.total) : '—'}
         />
         <InventoryMetric
-          icon={AlertTriangle}
           label="Low-stock items"
-          value={lowStock.data ? String(lowStock.data.length) : 'Unavailable'}
-          note="At or below their threshold"
-          warning={Boolean(lowStock.data?.length)}
+          value={lowStock.data ? String(lowStock.data.length) : '—'}
         />
-        <InventoryMetric
-          icon={CircleDollarSign}
-          label="Inventory value"
-          value="Unavailable"
-          note="A valuation basis is not yet defined"
-          qualified
-        />
-        <InventoryMetric
-          icon={Repeat2}
-          label="Stock movements"
-          value="Unavailable"
-          note="Movement history is not yet available"
-          qualified
-        />
+        <InventoryMetric label="Inventory value" value="—" />
+        <InventoryMetric label="Stock movements" value="—" />
       </div>
 
       {lowStock.isError ? (
@@ -372,31 +353,16 @@ function ProductListSkeleton() {
 }
 
 function InventoryMetric({
-  icon: Icon,
   label,
   value,
-  note,
-  warning = false,
-  qualified = false,
 }: {
-  icon: typeof Boxes;
   label: string;
   value: string;
-  note: string;
-  warning?: boolean;
-  qualified?: boolean;
 }) {
   return (
     <Surface className="inventory-metric">
-      <div className="inventory-metric__top">
-        <span className={warning ? 'inventory-metric__icon is-warning' : 'inventory-metric__icon'}>
-          <Icon aria-hidden="true" size={20} />
-        </span>
-        {qualified && <Badge className="sd-badge--warning">Qualified</Badge>}
-      </div>
       <p>{label}</p>
       <strong>{value}</strong>
-      <small>{note}</small>
     </Surface>
   );
 }

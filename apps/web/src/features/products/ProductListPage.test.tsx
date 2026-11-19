@@ -85,10 +85,15 @@ function renderPage() {
 
 test('shows actionable stock and product status without merging their meanings', () => {
   renderPage();
-  expect(screen.getByLabelText('Inventory summary')).toHaveTextContent('Total products');
-  expect(screen.getByLabelText('Inventory summary')).toHaveTextContent('Inventory value');
-  expect(screen.getByText('A valuation basis is not yet defined')).toBeInTheDocument();
-  expect(screen.getByText('Movement history is not yet available')).toBeInTheDocument();
+  const summary = screen.getByLabelText('Inventory summary');
+  expect(summary).toHaveTextContent('Total products');
+  expect(summary).toHaveTextContent('Inventory value');
+  expect(summary).toHaveTextContent('Stock movements');
+  expect(within(summary).getAllByText('—')).toHaveLength(2);
+  expect(screen.queryByText('A valuation basis is not yet defined')).not.toBeInTheDocument();
+  expect(screen.queryByText('Movement history is not yet available')).not.toBeInTheDocument();
+  expect(screen.queryByText('Across your product catalogue')).not.toBeInTheDocument();
+  expect(screen.queryByText('Qualified')).not.toBeInTheDocument();
   expect(screen.getByText('1 product needs attention')).toBeInTheDocument();
   expect(screen.getByText('Low stock')).toBeInTheDocument();
   expect(within(screen.getByRole('table')).getByText('Inactive')).toBeInTheDocument();

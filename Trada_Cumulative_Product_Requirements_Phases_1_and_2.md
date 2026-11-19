@@ -2180,3 +2180,10 @@ These items require clarification before the frontend treats the backend as the 
 - Preserved the existing product-query contract and moved clear and refresh controls into the results row.
 - Added the same active-filter indicator and compact mobile filter trigger used by Sales to prevent horizontal overflow.
 - Added focused coverage for collapsed filter behavior, query submission, and toolbar destinations.
+
+### Session 053 — Inventory summary-card parity
+
+- Reduced Inventory summary cards to the same title-and-value structure used by Sales.
+- Removed summary icons, warning icon treatments, qualification badges, and explanatory footnotes.
+- Replaced unsupported Inventory value and Stock movement figures with neutral em dashes instead of presenting unavailable-state copy inside the cards.
+- Preserved the separate actionable low-stock alert and product-row status indicators.

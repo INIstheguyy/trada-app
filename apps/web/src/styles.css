@@ -3905,49 +3905,26 @@ html.access-viewport-locked #root {
 }
 .inventory-metric {
   min-width: 0;
-  padding: 15px;
+  min-height: 96px;
+  padding: 16px;
   border-radius: 20px;
+  display: grid;
+  align-content: center;
+  gap: 6px;
   box-shadow: 0 5px 18px rgba(0, 40, 72, 0.05);
 }
-.inventory-metric__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.inventory-metric__icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  color: var(--sd-teal-700);
-  background: var(--sd-teal-100);
-  display: grid;
-  place-items: center;
-}
-.inventory-metric__icon.is-warning {
-  color: var(--sd-amber-700);
-  background: var(--sd-amber-100);
-}
 .inventory-metric p {
-  margin: 14px 0 3px;
+  margin: 0;
   color: var(--sd-text-muted);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 700;
 }
 .inventory-metric > strong {
   color: var(--sd-navy-900);
-  display: block;
-  font-size: clamp(19px, 5vw, 27px);
+  font-size: clamp(20px, 4vw, 27px);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.025em;
   white-space: nowrap;
-}
-.inventory-metric > small {
-  margin-top: 5px;
-  color: var(--sd-text-muted);
-  display: block;
-  font-size: 10px;
-  line-height: 1.35;
 }
 @media (min-width: 600px) {
   .next-actions-list {

@@ -10,6 +10,7 @@
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
+  font-size: 15px;
   color: var(--sd-text-primary);
   background: var(--sd-surface-page);
   font-synthesis: none;
@@ -64,11 +65,11 @@
   --sd-space-6: 24px;
   --sd-space-8: 32px;
   --sd-space-10: 40px;
-  --sd-text-xs: 0.75rem;
-  --sd-text-sm: 0.875rem;
+  --sd-text-xs: 0.733rem;
+  --sd-text-sm: 0.867rem;
   --sd-text-md: 1rem;
-  --sd-text-lg: 1.25rem;
-  --sd-text-xl: clamp(1.75rem, 4vw, 2.25rem);
+  --sd-text-lg: 1.133rem;
+  --sd-text-xl: clamp(1.4rem, 3vw, 1.8rem);
   --sd-leading-tight: 1.2;
   --sd-leading-body: 1.55;
   --sd-motion-fast: 160ms;

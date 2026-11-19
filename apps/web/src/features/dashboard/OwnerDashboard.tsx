@@ -1,4 +1,4 @@
-import { Button, Surface } from '@trada/ui';
+import { Button, PageHeader, Surface } from '@trada/ui';
 import {
   AlertCircle,
   ArrowRight,
@@ -23,7 +23,7 @@ import {
   useGetSalesAnalyticsQuery,
   useGetSalesQuery,
 } from '../../lib/api';
-import { formatNaira } from '../../lib/formatters';
+import { formatNaira, localDateKey } from '../../lib/formatters';
 
 type DashboardPeriod = 'today' | '7days' | '14days' | '30days' | 'custom';
 
@@ -33,12 +33,13 @@ type Metric = {
   value: number | null;
 };
 
-const periodOptions: { value: Exclude<DashboardPeriod, 'custom'>; label: string; days: number }[] = [
-  { value: 'today', label: 'Today', days: 1 },
-  { value: '7days', label: 'Last 7 days', days: 7 },
-  { value: '14days', label: 'Last 14 days', days: 14 },
-  { value: '30days', label: 'Last 30 days', days: 30 },
-];
+const periodOptions: { value: Exclude<DashboardPeriod, 'custom'>; label: string; days: number }[] =
+  [
+    { value: 'today', label: 'Today', days: 1 },
+    { value: '7days', label: 'Last 7 days', days: 7 },
+    { value: '14days', label: 'Last 14 days', days: 14 },
+    { value: '30days', label: 'Last 30 days', days: 30 },
+  ];
 
 const metricIcons: Record<Metric['key'], LucideIcon> = {
   sales: ShoppingCart,
@@ -119,71 +120,75 @@ export function OwnerDashboard({ firstName = 'there' }: { firstName?: string }) 
 
   return (
     <div className="dashboard dashboard--reference">
-      <header className="dashboard__heading">
-        <div>
-          <h1>{getGreeting(today)}, {firstName} <span aria-hidden="true">👋</span></h1>
-          <p>Here&apos;s how your business is doing today.</p>
-        </div>
-
-        <div className="dashboard-heading-actions">
-          <div className={`dashboard-filter${filterOpen ? ' is-open' : ''}`}>
-            <button
-              className="dashboard-filter__trigger"
-              type="button"
-              aria-expanded={filterOpen}
-              aria-controls="dashboard-filter-panel"
-              onClick={() => setFilterOpen((open) => !open)}
-            >
-              <CalendarDays aria-hidden="true" size={18} />
-              <span>{periodLabel}</span>
-              <ChevronDown aria-hidden="true" size={16} />
-            </button>
-            <div className="dashboard-filter__panel" id="dashboard-filter-panel">
-              <label className="dashboard-date-picker">
-                <span>Date</span>
-                <input
-                  type="date"
-                  aria-label="Dashboard date"
-                  max={todayKey}
-                  value={selectedDate}
-                  onChange={(event) => {
-                    setSelectedDate(event.target.value || todayKey);
-                    setPeriod(event.target.value === todayKey ? 'today' : 'custom');
-                    setFilterOpen(false);
-                  }}
-                />
-              </label>
-              <div className="dashboard-filter__shortcuts" aria-label="Dashboard date ranges">
-                {periodOptions.slice(1).map((option) => (
-                  <button
-                    type="button"
-                    key={option.value}
-                    className={period === option.value ? 'is-active' : ''}
-                    aria-pressed={period === option.value}
-                    onClick={() => selectPeriod(option.value)}
-                  >
-                    {option.days} days
-                  </button>
-                ))}
+      <PageHeader
+        className="dashboard__heading"
+        title={`${getGreeting(today)}, ${firstName} 👋`}
+        description="Here's how your business is doing today."
+        actions={
+          <div className="dashboard-heading-actions">
+            <div className={`dashboard-filter${filterOpen ? ' is-open' : ''}`}>
+              <button
+                className="dashboard-filter__trigger"
+                type="button"
+                aria-expanded={filterOpen}
+                aria-controls="dashboard-filter-panel"
+                onClick={() => setFilterOpen((open) => !open)}
+              >
+                <CalendarDays aria-hidden="true" size={18} />
+                <span>{periodLabel}</span>
+                <ChevronDown aria-hidden="true" size={16} />
+              </button>
+              <div className="dashboard-filter__panel" id="dashboard-filter-panel">
+                <label className="dashboard-date-picker">
+                  <span>Date</span>
+                  <input
+                    type="date"
+                    aria-label="Dashboard date"
+                    max={todayKey}
+                    value={selectedDate}
+                    onChange={(event) => {
+                      setSelectedDate(event.target.value || todayKey);
+                      setPeriod(event.target.value === todayKey ? 'today' : 'custom');
+                      setFilterOpen(false);
+                    }}
+                  />
+                </label>
+                <div className="dashboard-filter__shortcuts" aria-label="Dashboard date ranges">
+                  {periodOptions.slice(1).map((option) => (
+                    <button
+                      type="button"
+                      key={option.value}
+                      className={period === option.value ? 'is-active' : ''}
+                      aria-pressed={period === option.value}
+                      onClick={() => selectPeriod(option.value)}
+                    >
+                      {option.days} days
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
+            <button
+              className="icon-button dashboard-refresh"
+              type="button"
+              aria-label="Refresh dashboard"
+              onClick={refresh}
+            >
+              <RefreshCw aria-hidden="true" size={17} className={isFetching ? 'sd-spin' : ''} />
+            </button>
           </div>
-          <button
-            className="icon-button dashboard-refresh"
-            type="button"
-            aria-label="Refresh dashboard"
-            onClick={refresh}
-          >
-            <RefreshCw aria-hidden="true" size={17} className={isFetching ? 'sd-spin' : ''} />
-          </button>
-        </div>
-      </header>
+        }
+      />
 
       {hasPartialError && (
         <div className="dashboard-warning" role="status">
           <AlertCircle aria-hidden="true" size={17} />
-          <span>Some dashboard information could not be loaded. Available figures are still shown.</span>
-          <button type="button" onClick={refresh}>Retry</button>
+          <span>
+            Some dashboard information could not be loaded. Available figures are still shown.
+          </span>
+          <button type="button" onClick={refresh}>
+            Retry
+          </button>
         </div>
       )}
 
@@ -191,14 +196,16 @@ export function OwnerDashboard({ firstName = 'there' }: { firstName?: string }) 
         {metrics.map((metric) => {
           const Icon = metricIcons[metric.key];
           return (
-            <Surface className={`metric-card metric-card--${metric.key}`} key={metric.key}>
+            <Surface key={metric.key} className={`metric-card metric-card--${metric.key}`}>
               <span className={`metric-card__icon metric-card__icon--${metric.key}`}>
                 <Icon aria-hidden="true" size={22} />
               </span>
-              <div>
+              <div className="metric-card__body">
                 <p className="metric-card__label">{metric.label}</p>
                 {metric.value === null ? (
-                  <strong className="metric-card__placeholder" aria-label="Data unavailable">—</strong>
+                  <strong className="metric-card__placeholder" aria-label="Data unavailable">
+                    —
+                  </strong>
                 ) : (
                   <strong className="metric-card__value">{formatNaira.format(metric.value)}</strong>
                 )}
@@ -209,91 +216,95 @@ export function OwnerDashboard({ firstName = 'there' }: { firstName?: string }) 
       </section>
 
       <div className="dashboard-middle">
-      <section className="dashboard-quick-section" aria-labelledby="quick-actions-title">
-        <div className="dashboard-section-title">
-          <div>
-            <p className="eyebrow">Available now</p>
-            <h2 id="quick-actions-title">Quick actions</h2>
-          </div>
-        </div>
-        <div className="dashboard-quick-grid">
-          <QuickAction icon={ReceiptText} label="Record sale" to="/sales/new" />
-          <QuickAction icon={PackagePlus} label="Add product" to="/products/new" />
-          <QuickAction icon={Box} label="Inventory" to="/products" />
-          <button
-            className={`dashboard-quick-action${lowStockOpen ? ' is-active' : ''}`}
-            type="button"
-            aria-expanded={lowStockOpen}
-            aria-controls="dashboard-low-stock"
-            onClick={() => setLowStockOpen((open) => !open)}
-          >
-            <span className="dashboard-quick-action__icon">
-              <AlertCircle aria-hidden="true" size={23} />
-              <small>{stockCount ?? '—'}</small>
-            </span>
-            <strong>Low stock</strong>
-          </button>
-        </div>
-
-        {lowStockOpen && (
-          <Surface className="dashboard-low-stock" id="dashboard-low-stock">
-            <div className="panel__heading">
-              <div>
-                <h3>Low-stock products</h3>
-                <p>Products at or below their restock threshold</p>
-              </div>
-              {stockCount !== undefined && <span className="count-badge">{stockCount}</span>}
+        <section className="dashboard-quick-section" aria-labelledby="quick-actions-title">
+          <div className="dashboard-section-title">
+            <div>
+              <h2 id="quick-actions-title">Quick actions</h2>
             </div>
-            {lowStock.isLoading ? (
-              <PanelSkeleton />
-            ) : lowStock.isError || !lowStock.data ? (
-              <DashboardPanelError
-                message="Low-stock data is unavailable."
-                onRetry={() => void lowStock.refetch()}
-              />
-            ) : lowStock.data.length === 0 ? (
-              <DashboardEmpty icon={Box} message="Stock levels look healthy right now." />
-            ) : (
-              <div className="attention-list">
-                {lowStock.data.slice(0, 3).map((product) => (
-                  <article className="attention-item" key={product.id}>
-                    <span className="attention-item__icon attention-item__icon--medium">
-                      <Box aria-hidden="true" size={19} />
-                    </span>
-                    <div>
-                      <h3>{product.name}</h3>
-                      <p>{product.quantity} {product.unit} left · threshold {product.stockThreshold}</p>
-                      <Link to={`/products/${product.id}`}>
-                        Review product <ArrowRight aria-hidden="true" size={15} />
-                      </Link>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-            {lowStock.data && lowStock.data.length > 3 && (
-              <Link className="panel__footer-action" to="/products">
-                Review all low-stock products <ArrowRight aria-hidden="true" size={15} />
-              </Link>
-            )}
-          </Surface>
-        )}
-      </section>
+          </div>
+          <div className="dashboard-quick-grid">
+            <QuickAction icon={ReceiptText} label="Record sale" to="/sales/new" />
+            <QuickAction icon={PackagePlus} label="Add product" to="/products/new" />
+            <QuickAction icon={Box} label="Inventory" to="/products" />
+            <button
+              className={`dashboard-quick-action${lowStockOpen ? ' is-active' : ''}`}
+              type="button"
+              aria-expanded={lowStockOpen}
+              aria-controls="dashboard-low-stock"
+              onClick={() => setLowStockOpen((open) => !open)}
+            >
+              <span className="dashboard-quick-action__icon">
+                <AlertCircle aria-hidden="true" size={23} />
+                <small>{stockCount ?? '—'}</small>
+              </span>
+              <strong>Low stock</strong>
+            </button>
+          </div>
 
-      <section className="store-feature-preview" aria-labelledby="store-preview-title">
-        <div className="store-feature-preview__art" aria-hidden="true">
-          <Store size={38} />
-          <ShoppingCart size={19} />
-        </div>
-        <div className="store-feature-preview__copy">
-          <span className="store-feature-preview__status">
-            <LoaderCircle className="sd-spin" aria-hidden="true" size={14} /> In development
-          </span>
-          <h2 id="store-preview-title">Share your store</h2>
-          <p>Your BNPL-powered online storefront is being prepared.</p>
-        </div>
-        <button type="button" disabled>Coming soon</button>
-      </section>
+          {lowStockOpen && (
+            <Surface className="dashboard-low-stock" id="dashboard-low-stock">
+              <div className="panel__heading">
+                <div>
+                  <h3>Low-stock products</h3>
+                  <p>Products at or below their restock threshold</p>
+                </div>
+                {stockCount !== undefined && <span className="count-badge">{stockCount}</span>}
+              </div>
+              {lowStock.isLoading ? (
+                <PanelSkeleton />
+              ) : lowStock.isError || !lowStock.data ? (
+                <DashboardPanelError
+                  message="Low-stock data is unavailable."
+                  onRetry={() => void lowStock.refetch()}
+                />
+              ) : lowStock.data.length === 0 ? (
+                <DashboardEmpty icon={Box} message="Stock levels look healthy right now." />
+              ) : (
+                <div className="attention-list">
+                  {lowStock.data.slice(0, 3).map((product) => (
+                    <article className="attention-item" key={product.id}>
+                      <span className="attention-item__icon attention-item__icon--medium">
+                        <Box aria-hidden="true" size={19} />
+                      </span>
+                      <div>
+                        <h3>{product.name}</h3>
+                        <p>
+                          {product.quantity} {product.unit} left · threshold{' '}
+                          {product.stockThreshold}
+                        </p>
+                        <Link to={`/products/${product.id}`}>
+                          Review product <ArrowRight aria-hidden="true" size={15} />
+                        </Link>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+              {lowStock.data && lowStock.data.length > 3 && (
+                <Link className="panel__footer-action" to="/products">
+                  Review all low-stock products <ArrowRight aria-hidden="true" size={15} />
+                </Link>
+              )}
+            </Surface>
+          )}
+        </section>
+
+        <section className="store-feature-preview" aria-labelledby="store-preview-title">
+          <div className="store-feature-preview__art" aria-hidden="true">
+            <Store size={38} />
+            <ShoppingCart size={19} />
+          </div>
+          <div className="store-feature-preview__copy">
+            <span className="store-feature-preview__status">
+              <LoaderCircle className="sd-spin" aria-hidden="true" size={14} /> In development
+            </span>
+            <h2 id="store-preview-title">Share your store</h2>
+            <p>Your BNPL-powered online storefront is being prepared.</p>
+          </div>
+          <button type="button" disabled>
+            Coming soon
+          </button>
+        </section>
       </div>
 
       <Surface className="panel sales-panel dashboard-transactions">
@@ -318,11 +329,19 @@ export function OwnerDashboard({ firstName = 'there' }: { firstName?: string }) 
         ) : (
           <div className="product-list">
             {recentSales.data.sales.map((sale) => (
-              <Link className="product-row dashboard-sale-row" key={sale.id} to={`/sales/${sale.id}`}>
-                <span className="product-rank"><ShoppingCart aria-hidden="true" size={15} /></span>
+              <Link
+                className="product-row dashboard-sale-row"
+                key={sale.id}
+                to={`/sales/${sale.id}`}
+              >
+                <span className="product-rank">
+                  <ShoppingCart aria-hidden="true" size={15} />
+                </span>
                 <div className="product-row__main">
                   <h3>{sale.items[0]?.productName ?? sale.receiptNumber}</h3>
-                  <p>{formatSaleSummary(sale.items.length, sale.receiptNumber, sale.paymentStatus)}</p>
+                  <p>
+                    {formatSaleSummary(sale.items.length, sale.receiptNumber, sale.paymentStatus)}
+                  </p>
                 </div>
                 <div className="product-row__value">
                   <strong>{formatNaira.format(sale.totalAmount)}</strong>
@@ -345,7 +364,9 @@ export function OwnerDashboard({ firstName = 'there' }: { firstName?: string }) 
 function QuickAction({ icon: Icon, label, to }: { icon: LucideIcon; label: string; to: string }) {
   return (
     <Link className="dashboard-quick-action" to={to}>
-      <span className="dashboard-quick-action__icon"><Icon aria-hidden="true" size={23} /></span>
+      <span className="dashboard-quick-action__icon">
+        <Icon aria-hidden="true" size={23} />
+      </span>
       <strong>{label}</strong>
     </Link>
   );
@@ -365,7 +386,9 @@ function DashboardSkeleton() {
     <div className="dashboard dashboard--reference" aria-busy="true" aria-label="Loading dashboard">
       <div className="skeleton skeleton--title" />
       <div className="metrics-grid">
-        {[1, 2, 3, 4].map((number) => <div className="skeleton skeleton--metric" key={number} />)}
+        {[1, 2, 3, 4].map((number) => (
+          <div className="skeleton skeleton--metric" key={number} />
+        ))}
       </div>
       <div className="skeleton skeleton--briefing" />
     </div>
@@ -377,7 +400,9 @@ function DashboardPanelError({ message, onRetry }: { message: string; onRetry: (
     <div className="dashboard-panel-error" role="alert">
       <AlertCircle aria-hidden="true" size={22} />
       <p>{message}</p>
-      <Button variant="secondary" onClick={onRetry}>Try again</Button>
+      <Button variant="secondary" onClick={onRetry}>
+        Try again
+      </Button>
     </div>
   );
 }
@@ -416,20 +441,17 @@ function getPeriodContext(period: DashboardPeriod, selectedDate: string, todayKe
 
 function formatDateLabel(value: string, todayKey: string) {
   if (value === todayKey) {
-    return new Intl.DateTimeFormat('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }).format(
-      new Date(`${value}T12:00:00`),
-    );
+    return new Intl.DateTimeFormat('en-NG', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(new Date(`${value}T12:00:00`));
   }
-  return new Intl.DateTimeFormat('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }).format(
-    new Date(`${value}T12:00:00`),
-  );
-}
-
-function localDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return new Intl.DateTimeFormat('en-NG', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(`${value}T12:00:00`));
 }
 
 function formatSaleSummary(itemCount: number, receiptNumber: string, paymentStatus: string) {
@@ -440,7 +462,9 @@ function formatSaleSummary(itemCount: number, receiptNumber: string, paymentStat
 function formatTransactionDate(value: string, todayKey: string) {
   const date = new Date(value);
   const dateKey = localDateKey(date);
-  const time = new Intl.DateTimeFormat('en-NG', { hour: 'numeric', minute: '2-digit' }).format(date);
+  const time = new Intl.DateTimeFormat('en-NG', { hour: 'numeric', minute: '2-digit' }).format(
+    date,
+  );
   if (dateKey === todayKey) return `Today, ${time}`;
   return new Intl.DateTimeFormat('en-NG', { day: 'numeric', month: 'short' }).format(date);
 }

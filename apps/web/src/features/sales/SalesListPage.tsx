@@ -1,4 +1,4 @@
-import { Alert, Button, EmptyState, Input, PageHeader, Select, Surface } from '@trada/ui';
+import { Alert, Button, EmptyState, Input, PageHeader, Select, StatCard, Surface } from '@trada/ui';
 import {
   AlertCircle,
   ArrowLeft,
@@ -20,7 +20,7 @@ import {
   type PaymentStatus,
   type SaleStatus,
 } from '../../lib/api';
-import { formatNaira } from '../../lib/formatters';
+import { formatNaira, formatStatus } from '../../lib/formatters';
 
 export function SalesListPage() {
   const [draftSearch, setDraftSearch] = useState('');
@@ -73,6 +73,7 @@ export function SalesListPage() {
   return (
     <div className="sales-page">
       <PageHeader
+        eyebrow="Sales"
         title="Sales"
         description="Record sales, view performance and track revenue."
       />
@@ -98,10 +99,14 @@ export function SalesListPage() {
         >
           <ListFilter aria-hidden="true" size={17} />
           Filter
-          {hasFilters && <span className="sales-filter-toggle__status" aria-label="Filters applied" />}
+          {hasFilters && (
+            <span className="sales-filter-toggle__status" aria-label="Filters applied" />
+          )}
           <ChevronDown
             aria-hidden="true"
-            className={filtersOpen ? 'sales-filter-toggle__chevron is-open' : 'sales-filter-toggle__chevron'}
+            className={
+              filtersOpen ? 'sales-filter-toggle__chevron is-open' : 'sales-filter-toggle__chevron'
+            }
             size={15}
           />
         </Button>
@@ -114,19 +119,19 @@ export function SalesListPage() {
       )}
 
       <div className="sales-metrics">
-        <Metric
+        <StatCard
           label="Recorded sales"
           value={analytics.data ? String(analytics.data.totalSalesCount) : '—'}
         />
-        <Metric
+        <StatCard
           label="Booked revenue"
           value={analytics.data ? formatNaira.format(analytics.data.totalRevenue) : '—'}
         />
-        <Metric
+        <StatCard
           label="Gross profit"
           value={analytics.data ? formatNaira.format(analytics.data.grossProfit) : '—'}
         />
-        <Metric
+        <StatCard
           label="Unpaid sale balance"
           value={analytics.data ? formatNaira.format(analytics.data.unpaidBalance) : '—'}
         />
@@ -200,7 +205,7 @@ export function SalesListPage() {
                   />
                 </label>
               </div>
-              <button type="submit">Apply</button>
+              <Button type="submit">Apply</Button>
             </form>
           </div>
         )}
@@ -213,17 +218,17 @@ export function SalesListPage() {
           </span>
           <div>
             {hasFilters && (
-              <button type="button" onClick={clearFilters}>
+              <Button type="button" variant="ghost" onClick={clearFilters}>
                 Clear filters
-              </button>
+              </Button>
             )}
-            <button type="button" onClick={refresh} aria-label="Refresh sales">
+            <Button type="button" variant="ghost" onClick={refresh} aria-label="Refresh sales">
               <RefreshCw
                 aria-hidden="true"
                 size={16}
                 className={sales.isFetching || analytics.isFetching ? 'sd-spin' : ''}
               />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -276,7 +281,9 @@ export function SalesListPage() {
                       <strong>{formatSaleLabel(sale)}</strong>
                       <small>{formatSaleTimestamp(sale.createdAt)}</small>
                     </span>
-                    <span className={`sales-payment-method sales-payment-method--${sale.paymentMethod}`}>
+                    <span
+                      className={`sales-payment-method sales-payment-method--${sale.paymentMethod}`}
+                    >
                       {formatPaymentMethod(sale.paymentMethod)}
                     </span>
                     <strong className="sales-list-item__amount">
@@ -314,20 +321,6 @@ export function SalesListPage() {
   );
 }
 
-function Metric({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <Surface className="sales-metric">
-      <p>{label}</p>
-      <strong>{value}</strong>
-    </Surface>
-  );
-}
 function SalesSkeleton() {
   return (
     <div className="product-list-skeleton" aria-label="Loading sales" aria-busy="true">
@@ -336,9 +329,6 @@ function SalesSkeleton() {
       ))}
     </div>
   );
-}
-function formatStatus(value: string) {
-  return value.replaceAll('_', ' ').replace(/^./, (letter) => letter.toUpperCase());
 }
 function formatPaymentMethod(value: string) {
   if (value === 'pos') return 'POS/Card';

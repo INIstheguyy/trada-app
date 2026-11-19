@@ -12,7 +12,9 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { formatNaira } from '../../lib/formatters';
+import { formatNaira, formatFileSize, formatRecordingDuration, recordingToDataUrl } from '../../lib/formatters';
+import { BackLink } from '../../components/BackLink';
+import { TextField } from '../../components/FormFields';
 import { readApiError } from '../../lib/apiError';
 import {
   useCreateSaleMutation,
@@ -366,9 +368,7 @@ export function SaleCheckoutPage() {
 
   return (
     <div className="sales-page checkout-page">
-      <Link className="back-link" to="/sales">
-        <ArrowLeft aria-hidden="true" size={16} /> Sales
-      </Link>
+      <BackLink to="/sales">Sales</BackLink>
       <PageHeader
         eyebrow="New receipt"
         title="Record a sale"
@@ -624,7 +624,7 @@ export function SaleCheckoutPage() {
                         >
                           <Minus aria-hidden="true" size={14} />
                         </button>
-                        <input
+                        <Input
                           aria-label={`${item.product.name} quantity`}
                           type="number"
                           min="1"
@@ -648,7 +648,7 @@ export function SaleCheckoutPage() {
                     </label>
                     <label>
                       <span>Unit price</span>
-                      <input
+                      <Input
                         aria-label={`${item.product.name} unit price`}
                         type="number"
                         min="0"
@@ -660,7 +660,7 @@ export function SaleCheckoutPage() {
                     </label>
                     <label>
                       <span>Item discount</span>
-                      <input
+                      <Input
                         aria-label={`${item.product.name} item discount`}
                         type="number"
                         min="0"
@@ -699,18 +699,21 @@ export function SaleCheckoutPage() {
               <p>Optional for walk-in sales; required operationally for credit follow-up.</p>
             </div>
             <div className="form-grid">
-              <CheckoutField
+              <TextField
+                id="customer-name"
                 label="Customer name"
                 value={customerName}
                 onChange={setCustomerName}
               />
-              <CheckoutField
+              <TextField
+                id="customer-phone"
                 label="Phone number"
                 value={customerPhone}
                 onChange={setCustomerPhone}
                 type="tel"
               />
-              <CheckoutField
+              <TextField
+                id="customer-email"
                 label="Email"
                 value={customerEmail}
                 onChange={setCustomerEmail}
@@ -836,40 +839,4 @@ export function SaleCheckoutPage() {
   );
 }
 
-function CheckoutField({
-  label,
-  value,
-  onChange,
-  type = 'text',
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-}) {
-  const id = `customer-${label.toLowerCase().replaceAll(' ', '-')}`;
-  return (
-    <FormField htmlFor={id} label={label}>
-      <Input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} />
-    </FormField>
-  );
-}
 
-function recordingToDataUrl(recording: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener('load', () => resolve(String(reader.result)));
-    reader.addEventListener('error', () => reject(reader.error));
-    reader.readAsDataURL(recording);
-  });
-}
-
-function formatRecordingDuration(durationSeconds: number) {
-  const minutes = Math.floor(durationSeconds / 60);
-  const seconds = durationSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
-
-function formatFileSize(bytes: number) {
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}

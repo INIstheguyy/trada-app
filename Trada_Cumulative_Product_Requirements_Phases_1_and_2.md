@@ -2,7 +2,7 @@
 
 **Coverage:** Phase One and Phase Two, with explicitly separated future vision  
 **Document type:** Product requirements context and business/product analysis — **not a technical requirements specification**  
-**Version:** 1.1 | **Prepared:** 3 November 2026 | **Implementation status updated:** 18 November 2026
+**Version:** 1.1 | **Prepared:** 3 November 2026 | **Implementation status updated:** 19 November 2026
 **Intended use:** Source context for a separate technical requirements, design system, UX, and engineering planning exercise.
 
 > **Important:** This compilation consolidates the decisions, product directions, concepts and suggestions developed in the Trada conversations. A feature being discussed does not mean it has been approved, built, or committed to Phase One. The Phase One/Phase Two split below is a **recommended consolidation** of our evolving scope, not a formally signed-off release contract. This distinction matters because previous conversations used terms such as MVP, V2, “next,” and “later” at different times.
@@ -772,14 +772,14 @@ At the end of every substantive delivery session, the team should update:
 
 ## 36. Current implementation status
 
-### 36.1 Frontend status as of 17 November 2026
+### 36.1 Frontend status as of 19 November 2026
 
 | Capability                        | Status                           | Current evidence / limitation                                                                                                                                                                                                                                                                                                            |
 | --------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Monorepo foundation               | **Implemented and verified**     | React, TypeScript, Vite, pnpm workspaces, `apps/web` and `packages/ui`.                                                                                                                                                                                                                                                                  |
 | Design tokens and primitives      | **Implemented and verified**     | Semantic colour tokens plus Button, Badge and Surface primitives.                                                                                                                                                                                                                                                                        |
 | Responsive application shell      | **Implemented and verified**     | Mobile bottom navigation, tablet rail and desktop sidebar.                                                                                                                                                                                                                                                                               |
-| Design tokens and primitives      | **Implemented and verified**     | Semantic colour tokens updated to Trada.com.ng brand palette (dark navy `#0d1b4b`, brand green `#1a9e36`); Button, Badge and Surface primitives unchanged.                                                                                                                                                                               |
+| Design tokens and primitives      | **Implemented and verified**     | Semantic colour tokens updated to Trada.com.ng brand palette (dark navy `#0d1b4b`, brand green `#1a9e36`); Button, Badge (with `tone` prop for success/warning/error/info), Surface, FormField, Input, Select, Textarea, Alert, PageHeader, EmptyState, StatCard and PasswordInput primitives in `@trada/ui`. Shared `TextField`, `NumberField`, `BackLink` app components. Shared `formatStatus`, `formatRecordingDuration`, `formatFileSize`, `localDateKey`, `recordingToDataUrl`, `fileToDataUrl` utility functions in `lib/formatters.ts`. |
 | Responsive application shell      | **Implemented and verified**     | Mobile bottom navigation, tablet rail and desktop sidebar. Brand mark updated from "S" to "T".                                                                                                                                                                                                                                           |
 | PWA shell                         | **Implemented and verified**     | Production build generates the manifest and service worker; online-first transactional behavior remains the product rule.                                                                                                                                                                                                                |
 | Reference-led merchant composition | **Implemented and verified**     | Dashboard, Sales and Inventory now use the shared rounded KPI/action/card language across responsive breakpoints. Current records and qualified/unavailable values are retained; charts, valuation, movements and other unsupported screenshot features remain absent.                                                                                                      |
@@ -2187,3 +2187,45 @@ These items require clarification before the frontend treats the backend as the 
 - Removed summary icons, warning icon treatments, qualification badges, and explanatory footnotes.
 - Replaced unsupported Inventory value and Stock movement figures with neutral em dashes instead of presenting unavailable-state copy inside the cards.
 - Preserved the separate actionable low-stock alert and product-row status indicators.
+
+
+### Session 054 — Cross-module UI consistency audit and shared-component polish
+
+**Date:** 19 November 2026
+**Outcome:** Audited the entire user workflow across auth, onboarding, dashboard, sales and inventory for interaction inconsistencies, then unified reusable UI components (inputs, buttons, form fields, badges, metric cards, back links, formatters) across all views.
+
+**Completed:**
+
+- Produced a visual workflow audit artifact mapping the complete user journey from registration through dashboard, sales and inventory with a Mermaid flow diagram and identified nine priority issues (P1–P9).
+- **P1 — Cart inputs:** Replaced 3 raw `<input>` elements in `SaleCheckoutPage` (quantity, unit price, item discount) with `<Input>` from `@trada/ui`.
+- **P2 — Filter buttons:** Replaced raw `<button>` elements in `SalesListPage` and `ProductListPage` with `<Button>` and `<Button variant="ghost">` from `@trada/ui`.
+- **P3 — Field wrappers:** Created shared `TextField` and `NumberField` in `apps/web/src/components/FormFields.tsx` with a `showRequiredMarker` prop. Replaced local `CheckoutField`, `SettingsField`, `BusinessField` and local `TextField`/`NumberField` from `ProductFormPage`. `AccountField` in `RegisterPage` was deliberately retained because it branches between `PasswordInput` and `Input`.
+- **P4 — Voice recording hook:** Created `apps/web/src/lib/useVoiceRecording.ts` extracting the shared MediaRecorder pattern. The hook is ready but not yet wired into consumers.
+- **P5 — Utility consolidation:** Extended `lib/formatters.ts` with `formatStatus`, `formatRecordingDuration`, `formatFileSize`, `localDateKey`, `recordingToDataUrl` and `fileToDataUrl`. Removed duplicates from `SaleDetailPage`, `SalesListPage`, `SaleCheckoutPage`, `ProductFormPage`, `OwnerDashboard` and `App`.
+- **P6 — StatCard adoption:** Replaced local `Metric` in `SalesListPage`, `InventoryMetric` in `ProductListPage` and `Surface`-based metric cards in `OwnerDashboard` with `StatCard` from `@trada/ui`.
+- **P7 — Badge tone prop:** Added a `tone` prop (`success | warning | error | info`) to `Badge` in `packages/ui`, moved default colours from `.sd-badge` to `.sd-badge--success`, added error and info tone styles, and updated `SaleDetailPage` and `BusinessSettingsPage` to use the prop instead of className overrides.
+- **P8 — BackLink component:** Created `apps/web/src/components/BackLink.tsx` and replaced raw `<Link className="back-link">` in `SaleDetailPage`, `SaleCheckoutPage`, `ProductFormPage` and `BusinessSettingsPage`.
+- **P9 — Eyebrow consistency:** Fixed duplicate eyebrow/title in `LoginPage` (eyebrow→"Sign in", title kept "Welcome back" for test compatibility), `ProductListPage` (eyebrow "Inventory", title "Products"), added missing eyebrow to `SalesListPage`, and replaced raw `<header>` with `<PageHeader>` in `OwnerDashboard`.
+- **Additional:** Changed `BusinessOnboardingPage` default post-setup destination from `/products/new` to `/` (dashboard) for a less disorienting first-run experience.
+
+**Verification:**
+
+- TypeScript type-check passed with zero errors.
+- Vitest passed 17 test files, 49 tests, all green.
+- 13 files modified, 3 new files created.
+
+**Limitations:**
+
+- `AccountField` in `RegisterPage` was not unified into the shared `TextField` because it branches between `PasswordInput` and `Input` based on field type.
+- `useVoiceRecording` hook was created but not yet wired into `SaleCheckoutPage` or `ProductFormPage`; inline recording code remains in place.
+- `--sd-blue-700` does not exist in design tokens; Badge info tone uses `--sd-navy-700` as a substitute.
+
+**Product decisions recorded:**
+
+- Business onboarding default destination changed from `/products/new` to `/` (dashboard).
+
+**Delivery risks:**
+
+- Some legacy CSS classes (`.sales-metric`, `.inventory-metric`, `.inventory-filters__apply`) may now be unused after `StatCard` adoption. A CSS audit pass would confirm and clean these up.
+
+**Next session target:** Wire the `useVoiceRecording` hook into `SaleCheckoutPage` and `ProductFormPage`, consider unifying `AccountField`, and perform a dead-CSS cleanup pass.

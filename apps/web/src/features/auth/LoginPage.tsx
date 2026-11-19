@@ -64,7 +64,7 @@ export function LoginPage() {
       }}
     >
       <AuthHeading
-        eyebrow="Welcome back"
+        eyebrow="Sign in"
         title="Welcome back"
         description="Access your Trada business account."
       />

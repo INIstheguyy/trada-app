@@ -58,15 +58,28 @@
   min-height: 26px;
   padding: 3px 9px;
   border-radius: 999px;
-  color: var(--sd-green-700);
-  background: var(--sd-green-100);
   font-size: var(--sd-text-xs);
   font-weight: 700;
+}
+
+.sd-badge--success {
+  color: var(--sd-green-700);
+  background: var(--sd-green-100);
 }
 
 .sd-badge--warning {
   color: var(--sd-amber-700);
   background: var(--sd-amber-100);
+}
+
+.sd-badge--error {
+  color: var(--sd-red-700);
+  background: var(--sd-red-100);
+}
+
+.sd-badge--info {
+  color: var(--sd-navy-700);
+  background: var(--sd-blue-100);
 }
 
 .sd-field {
@@ -319,7 +332,7 @@
 
 .sd-stat-card__value {
   color: var(--sd-navy-900);
-  font-size: clamp(1.25rem, 3vw, 1.75rem);
+  font-size: clamp(1rem, 2.5vw, 1.4rem);
   line-height: var(--sd-leading-tight);
 }
 

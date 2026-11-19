@@ -19,6 +19,8 @@ import {
   type BusinessInput,
 } from '../../lib/api';
 import { readApiError } from '../../lib/apiError';
+import { BackLink } from '../../components/BackLink';
+import { TextField } from '../../components/FormFields';
 
 const emptyForm: BusinessInput = {
   name: '',
@@ -90,15 +92,13 @@ export function BusinessSettingsPage() {
 
   return (
     <div className="settings-page">
-      <Link className="back-link" to="/">
-        <ArrowLeft aria-hidden="true" size={16} /> Overview
-      </Link>
+      <BackLink to="/">Overview</BackLink>
       <PageHeader
         eyebrow="Workspace settings"
         title="Business identity"
         description="Keep the business details used across your private records accurate."
         actions={
-          <Badge className="sd-badge--warning">
+          <Badge tone="warning">
             <LockKeyhole aria-hidden="true" size={13} /> Private workspace
           </Badge>
         }
@@ -124,7 +124,7 @@ export function BusinessSettingsPage() {
               </div>
             </div>
             <div className="form-grid">
-              <SettingsField
+              <TextField
                 id="business-name"
                 label="Business name"
                 value={form.name}
@@ -156,7 +156,7 @@ export function BusinessSettingsPage() {
                   <option value="Input based">Input based</option>
                 </Select>
               </FormField>
-              <SettingsField
+              <TextField
                 id="business-industry"
                 label="Industry"
                 value={form.industry}
@@ -235,27 +235,3 @@ export function BusinessSettingsPage() {
   );
 }
 
-function SettingsField({
-  id,
-  label,
-  value,
-  onChange,
-  required = false,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  required?: boolean;
-}) {
-  return (
-    <FormField htmlFor={id} label={label} required={required}>
-      <Input
-        id={id}
-        required={required}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </FormField>
-  );
-}

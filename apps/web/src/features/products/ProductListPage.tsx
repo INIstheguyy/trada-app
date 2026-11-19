@@ -1,4 +1,14 @@
-import { Alert, Badge, Button, EmptyState, Input, PageHeader, Select, Surface } from '@trada/ui';
+import {
+  Alert,
+  Badge,
+  Button,
+  EmptyState,
+  Input,
+  PageHeader,
+  Select,
+  StatCard,
+  Surface,
+} from '@trada/ui';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -64,8 +74,8 @@ export function ProductListPage() {
   return (
     <div className="products-page">
       <PageHeader
-        eyebrow="Inventory"
-        title="Inventory"
+        eyebrow=""
+        title="Products"
         description="Find products, review stock levels and keep selling details accurate."
       />
 
@@ -110,16 +120,13 @@ export function ProductListPage() {
       </div>
 
       <div className="inventory-summary" aria-label="Inventory summary">
-        <InventoryMetric
-          label="Total products"
-          value={data ? String(data.pagination.total) : '—'}
-        />
-        <InventoryMetric
+        <StatCard label="Total products" value={data ? String(data.pagination.total) : '—'} />
+        <StatCard
           label="Low-stock items"
           value={lowStock.data ? String(lowStock.data.length) : '—'}
         />
-        <InventoryMetric label="Inventory value" value="—" />
-        <InventoryMetric label="Stock movements" value="—" />
+        <StatCard label="Inventory value" value="—" />
+        <StatCard label="Stock movements" value="—" />
       </div>
 
       {lowStock.isError ? (
@@ -130,9 +137,9 @@ export function ProductListPage() {
         >
           <strong>Low-stock status is unavailable.</strong>
           <span>Your product list is still available. Retry the stock check when ready.</span>
-          <button type="button" onClick={() => void lowStock.refetch()}>
+          <Button type="button" variant="ghost" onClick={() => void lowStock.refetch()}>
             Retry stock check
-          </button>
+          </Button>
         </Alert>
       ) : lowStock.data && lowStock.data.length > 0 ? (
         <Surface className="low-stock-strip" aria-labelledby="low-stock-heading">
@@ -198,9 +205,7 @@ export function ProductListPage() {
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </Select>
-              <button className="inventory-filters__apply" type="submit">
-                Apply
-              </button>
+              <Button type="submit">Apply</Button>
             </form>
           </div>
         )}
@@ -212,17 +217,18 @@ export function ProductListPage() {
             </span>
             <div>
               {hasFilters && (
-                <button type="button" onClick={clearFilters}>
+                <Button type="button" variant="ghost" onClick={clearFilters}>
                   Clear filters
-                </button>
+                </Button>
               )}
-              <button type="button" onClick={() => void refetch()} aria-label="Refresh products">
-                <RefreshCw
-                  aria-hidden="true"
-                  size={16}
-                  className={isFetching ? 'sd-spin' : ''}
-                />
-              </button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => void refetch()}
+                aria-label="Refresh products"
+              >
+                <RefreshCw aria-hidden="true" size={16} className={isFetching ? 'sd-spin' : ''} />
+              </Button>
             </div>
           </div>
         )}
@@ -349,20 +355,5 @@ function ProductListSkeleton() {
         <div className="skeleton" key={item} />
       ))}
     </div>
-  );
-}
-
-function InventoryMetric({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <Surface className="inventory-metric">
-      <p>{label}</p>
-      <strong>{value}</strong>
-    </Surface>
   );
 }

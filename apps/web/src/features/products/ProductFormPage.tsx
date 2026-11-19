@@ -38,6 +38,9 @@ import {
   type ProductUpdateInput,
 } from '../../lib/api';
 import { readApiError } from '../../lib/apiError';
+import { formatFileSize, formatRecordingDuration, fileToDataUrl, recordingToDataUrl } from '../../lib/formatters';
+import { BackLink } from '../../components/BackLink';
+import { NumberField, TextField } from '../../components/FormFields';
 
 const emptyProduct: ProductInput = {
   name: '',
@@ -520,9 +523,7 @@ export function ProductFormPage() {
 
   return (
     <div className="products-page product-form-page">
-      <Link className="back-link" to="/products">
-        <ArrowLeft aria-hidden="true" size={16} /> Products
-      </Link>
+      <BackLink to="/products">Products</BackLink>
       <PageHeader
         eyebrow={isEditing ? 'Inventory record' : 'New inventory record'}
         title={isEditing ? 'Edit product' : 'Add a product'}
@@ -1083,71 +1084,6 @@ export function ProductFormPage() {
   );
 }
 
-function TextField({
-  id,
-  label,
-  value,
-  onChange,
-  required = false,
-  hint,
-  autoComplete,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  required?: boolean;
-  hint?: string;
-  autoComplete?: string;
-}) {
-  return (
-    <FormField htmlFor={id} label={label} required={required} hint={hint}>
-      <Input
-        id={id}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        required={required}
-        aria-describedby={hint ? `${id}-hint` : undefined}
-        autoComplete={autoComplete}
-      />
-    </FormField>
-  );
-}
-
-function NumberField({
-  id,
-  label,
-  value,
-  onChange,
-  required = false,
-  hint,
-}: {
-  id: string;
-  label: string;
-  value: number | null | undefined;
-  onChange: (value: number | null) => void;
-  required?: boolean;
-  hint?: string;
-}) {
-  return (
-    <FormField htmlFor={id} label={label} required={required} hint={hint}>
-      <Input
-        id={id}
-        type="number"
-        min="0"
-        step="0.01"
-        value={value ?? ''}
-        onChange={(event) =>
-          onChange(event.target.value === '' ? null : Number(event.target.value))
-        }
-        required={required}
-        aria-describedby={hint ? `${id}-hint` : undefined}
-        inputMode="decimal"
-      />
-    </FormField>
-  );
-}
-
 function ProductFormSkeleton() {
   return (
     <div
@@ -1162,29 +1098,3 @@ function ProductFormSkeleton() {
   );
 }
 
-function recordingToDataUrl(recording: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener('load', () => resolve(String(reader.result)));
-    reader.addEventListener('error', () => reject(reader.error));
-    reader.readAsDataURL(recording);
-  });
-}
-
-function formatRecordingDuration(durationSeconds: number) {
-  const minutes = Math.floor(durationSeconds / 60);
-  return `${minutes}:${(durationSeconds % 60).toString().padStart(2, '0')}`;
-}
-
-function formatFileSize(bytes: number) {
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener('load', () => resolve(String(reader.result)));
-    reader.addEventListener('error', () => reject(reader.error));
-    reader.readAsDataURL(file);
-  });
-}

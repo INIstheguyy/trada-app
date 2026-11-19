@@ -13,7 +13,7 @@ import {
   useGetMyBusinessQuery,
   useGetSalesAnalyticsQuery,
 } from './lib/api';
-import { formatNaira } from './lib/formatters';
+import { formatNaira, localDateKey } from './lib/formatters';
 
 const LoginPage = lazy(() =>
   import('./features/auth/LoginPage').then(({ LoginPage }) => ({ default: LoginPage })),
@@ -283,9 +283,3 @@ function buildBusinessBriefing(
   return `${salesSummary} ${stockSummary}`;
 }
 
-function localDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}

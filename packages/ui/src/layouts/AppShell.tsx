@@ -3,7 +3,6 @@ import {
   CircleUserRound,
   House,
   LogOut,
-  Mic,
   MoreHorizontal,
   Plus,
   ReceiptText,
@@ -208,7 +207,7 @@ export function AppShell({
         className="sd-bottom-nav"
         aria-label="Mobile navigation"
       >
-        {navigation.slice(0, 3).map(({ id, label, icon, href }) => {
+        {navigation.slice(0, 2).map(({ id, label, icon, href }) => {
           const Icon = icons[icon];
           return (
             <a
@@ -226,17 +225,31 @@ export function AppShell({
         <button
           className="sd-bottom-nav__ai"
           type="button"
-          aria-label="Open AI voice assistant"
+          aria-label="Open AI assistant"
           aria-haspopup="dialog"
           aria-expanded={mobilePanel === 'ai'}
           onClick={() => setMobilePanel((panel) => (panel === 'ai' ? null : 'ai'))}
         >
           <span aria-hidden="true">
-            <Sparkles size={24} />
-            <Mic size={17} />
+            <Sparkles size={22} />
           </span>
-          <small>AI voice</small>
+          <small>AI</small>
         </button>
+        {navigation.slice(2, 3).map(({ id, label, icon, href }) => {
+          const Icon = icons[icon];
+          return (
+            <a
+              className={`sd-bottom-nav__item ${activeNav === id ? 'is-active' : ''}`}
+              href={href}
+              key={label}
+              aria-current={activeNav === id ? 'page' : undefined}
+              onClick={(event) => handleNavigate(event, href)}
+            >
+              <Icon aria-hidden="true" size={21} />
+              <span>{label}</span>
+            </a>
+          );
+        })}
         <button
           className="sd-bottom-nav__item sd-bottom-nav__more"
           type="button"

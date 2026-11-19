@@ -6,7 +6,8 @@ import { useAppSelector } from '../../app/hooks';
 import { can, normalizeRole } from '../../app/permissions';
 import { useCancelSaleMutation, useGetSaleQuery } from '../../lib/api';
 import { readApiError } from '../../lib/apiError';
-import { formatNaira } from '../../lib/formatters';
+import { formatNaira, formatStatus } from '../../lib/formatters';
+import { BackLink } from '../../components/BackLink';
 
 export function SaleDetailPage() {
   const { id = '' } = useParams();
@@ -48,19 +49,17 @@ export function SaleDetailPage() {
   const canCancel = can(role, 'sale:cancel') && sale.status === 'completed';
   return (
     <div className="sales-page sale-detail-page">
-      <Link className="back-link" to="/sales">
-        <ArrowLeft aria-hidden="true" size={16} /> Sales
-      </Link>
+      <BackLink to="/sales">Sales</BackLink>
       <PageHeader
         eyebrow="Sale receipt"
         title={sale.receiptNumber}
         description={`${formatDateTime(sale.createdAt)} · ${sale.customerName || 'Walk-in customer'}`}
         actions={
           <div className="sale-detail-status">
-            <Badge className={sale.status === 'completed' ? '' : 'sd-badge--warning'}>
+            <Badge tone={sale.status === 'completed' ? 'success' : 'warning'}>
               {formatStatus(sale.status)}
             </Badge>
-            <Badge className={sale.paymentStatus === 'paid' ? '' : 'sd-badge--warning'}>
+            <Badge tone={sale.paymentStatus === 'paid' ? 'success' : 'warning'}>
               {formatStatus(sale.paymentStatus)}
             </Badge>
           </div>
@@ -176,9 +175,6 @@ function DetailRow({
       <strong>{formatNaira.format(value)}</strong>
     </div>
   );
-}
-function formatStatus(value: string) {
-  return value.replaceAll('_', ' ').replace(/^./, (letter) => letter.toUpperCase());
 }
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat('en-NG', { dateStyle: 'medium', timeStyle: 'short' }).format(

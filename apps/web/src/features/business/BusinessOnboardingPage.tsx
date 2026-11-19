@@ -10,6 +10,7 @@ import {
 } from '../../lib/api';
 import { readApiError } from '../../lib/apiError';
 import { apiStatus } from '../../lib/apiStatus';
+import { TextField } from '../../components/FormFields';
 
 type OnboardingLocationState = { from?: string };
 
@@ -24,7 +25,7 @@ const initialBusiness: BusinessInput = {
 export function BusinessOnboardingPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const destination = (location.state as OnboardingLocationState | null)?.from ?? '/products/new';
+  const destination = (location.state as OnboardingLocationState | null)?.from ?? '/';
   const businessQuery = useGetMyBusinessQuery();
   const [createBusiness, createState] = useCreateBusinessMutation();
   const [business, setBusiness] = useState(initialBusiness);
@@ -151,12 +152,14 @@ export function BusinessOnboardingPage() {
             <p>Start with the name customers know and a short description.</p>
           </header>
 
-          <BusinessField
+          <TextField
             id="business-name"
             label="Business name"
             value={business.name}
             onChange={(name) => setBusiness({ ...business, name })}
             placeholder="e.g. Acme Motors"
+            required
+            showRequiredMarker={false}
           />
 
           <FormField htmlFor="business-description" label="Business description">
@@ -212,12 +215,14 @@ export function BusinessOnboardingPage() {
             </FormField>
           </div>
 
-          <BusinessField
+          <TextField
             id="business-industry"
             label="Industry"
             value={business.industry}
             onChange={(industry) => setBusiness({ ...business, industry })}
             placeholder="e.g. Automotive, Retail, Food"
+            required
+            showRequiredMarker={false}
           />
 
           <div className="onboarding-step-actions">
@@ -245,28 +250,3 @@ export function BusinessOnboardingPage() {
   );
 }
 
-function BusinessField({
-  id,
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <FormField htmlFor={id} label={label}>
-      <Input
-        id={id}
-        required
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-      />
-    </FormField>
-  );
-}

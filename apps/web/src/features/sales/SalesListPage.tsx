@@ -73,7 +73,7 @@ export function SalesListPage() {
   return (
     <div className="sales-page">
       <PageHeader
-        eyebrow="Sales"
+        eyebrow=""
         title="Sales"
         description="Record sales, view performance and track revenue."
       />

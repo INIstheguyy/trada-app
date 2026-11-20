@@ -2,7 +2,7 @@
 
 **Coverage:** Phase One and Phase Two, with explicitly separated future vision  
 **Document type:** Product requirements context and business/product analysis — **not a technical requirements specification**  
-**Version:** 1.1 | **Prepared:** 3 November 2026 | **Implementation status updated:** 19 November 2026
+**Version:** 1.1 | **Prepared:** 3 November 2026 | **Implementation status updated:** 20 November 2026
 **Intended use:** Source context for a separate technical requirements, design system, UX, and engineering planning exercise.
 
 > **Important:** This compilation consolidates the decisions, product directions, concepts and suggestions developed in the Trada conversations. A feature being discussed does not mean it has been approved, built, or committed to Phase One. The Phase One/Phase Two split below is a **recommended consolidation** of our evolving scope, not a formally signed-off release contract. This distinction matters because previous conversations used terms such as MVP, V2, “next,” and “later” at different times.
@@ -772,7 +772,7 @@ At the end of every substantive delivery session, the team should update:
 
 ## 36. Current implementation status
 
-### 36.1 Frontend status as of 19 November 2026
+### 36.1 Frontend status as of 20 November 2026
 
 | Capability                        | Status                           | Current evidence / limitation                                                                                                                                                                                                                                                                                                            |
 | --------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -794,7 +794,7 @@ At the end of every substantive delivery session, the team should update:
 | Products and low-stock alerts     | **Implemented and verified**     | Searchable/paginated list, low-stock summary, create, detail/edit and guarded delete routes are implemented against the documented contract. Live backend testing was intentionally deferred.                                                                                                                                            |
 | Sales and sales analytics         | **Implemented and verified**     | Protected checkout, filtered/paginated history, detail, guarded cancellation/restock and analytics are implemented against the documented contract. Revenue, received amount and balance due remain distinct. Live backend testing was intentionally deferred.                                                                           |
 | Full production RBAC              | **Blocked by decision/contract** | Backend documentation exposes a generic `user` role but no staff membership, permission, branch, approval or authorization-denied contract.                                                                                                                                                                                              |
-| AI capture and draft review       | **Partially defined**            | The mobile centre launcher routes permitted users to draft-only voice sale or product creation with explicit merchant review; product-update suggestions remain non-applying previews. The image endpoint is exposed only as an acknowledged contract test because it writes immediately. Unified AI, confidence, idempotency, safe image drafts, inventory authorization/audit and production release gates remain unresolved.            |
+| AI capture and draft review       | **Partially defined**            | New sale and product workflows begin with an explicit capture-method choice. Voice selection shows an animated waveform and a three-second countdown before requesting microphone access; after recording stops, its completed audio is sent for a draft request. Manual selection opens only the existing editable form. Product image selection opens an `environment` camera capture on supporting mobile browsers and the normal file picker on desktop. Applying an AI draft opens the existing editable form, and persistence still requires the normal explicit submit action. The mobile centre launcher routes permitted users to these focused draft-only workflows; product-update suggestions remain separately guarded. Unified AI, live transcription, confidence, idempotency, inventory authorization/audit and production release gates remain unresolved. |
 | Expenses, purchases and suppliers | **Planned**                      | Required by the PRD but not present in the received backend contract.                                                                                                                                                                                                                                                                    |
 | Storefront and marketing          | **Planned**                      | Required direction, but no received backend contract yet.                                                                                                                                                                                                                                                                                |
 
@@ -2229,3 +2229,148 @@ These items require clarification before the frontend treats the backend as the 
 - Some legacy CSS classes (`.sales-metric`, `.inventory-metric`, `.inventory-filters__apply`) may now be unused after `StatCard` adoption. A CSS audit pass would confirm and clean these up.
 
 **Next session target:** Wire the `useVoiceRecording` hook into `SaleCheckoutPage` and `ProductFormPage`, consider unifying `AccountField`, and perform a dead-CSS cleanup pass.
+
+### Session 055 — Current-date dashboard query alignment
+
+**Date:** 20 November 2026
+**Outcome:** Current-date dashboard requests now rely on the backend's default date behavior instead of sending redundant `startDate` and `endDate` query parameters.
+
+**Completed:**
+
+- Removed `startDate` and `endDate` from the dashboard analytics and recent-sales requests when the active period is Today.
+- Aligned the home-screen AI briefing analytics request with the same parameter-free current-date request.
+- Preserved explicit inclusive date parameters for historical calendar dates and multi-day dashboard ranges.
+- Added focused regression coverage for both the parameter-free current-date requests and the retained historical/range behavior.
+
+**Verification:** Focused dashboard coverage passed with 7 tests. ESLint passed for the three changed frontend files, and the TypeScript check passed.
+
+**Verification limitation:** Repository-wide ESLint remains red on eight unrelated, pre-existing unused imports in business, product and sales files. This session did not modify those files or broaden scope to clean them up.
+
+**Product decision:** The dashboard's Today view uses the backend's unfiltered/default date behavior. Historical single-day and multi-day views continue to send explicit inclusive ranges. This implementation direction does not, by itself, approve a broader product requirement for date-default semantics.
+
+**Backend contract gap:** The received HTTP contract marks analytics `startDate` and `endDate` as optional but does not define the date window applied when they are omitted; equivalent omission semantics for `GET /sales` are also not explicitly documented. The frontend now follows the supplied integration direction, but the backend default should be recorded explicitly in the contract.
+
+**Delivery risk:** If the backend's omitted-date default changes or differs between analytics and sales-list endpoints, the Today summary and recent transactions can represent different windows without a client-visible contract signal.
+
+**Next session target:** Confirm and document the backend's omitted-date defaults for both dashboard data sources, then continue the planned shared voice-recording and dead-CSS cleanup work.
+
+### Session 056 — Dashboard action and disclosure simplification
+
+**Date:** 20 November 2026
+**Outcome:** Simplified the dashboard's action hierarchy and removed two non-actionable presentation elements.
+
+**Completed:**
+
+- Swapped Low stock into the first Quick Actions position and moved Record sale into the former fourth position; all four existing actions and destinations remain available.
+- Removed the disabled `Coming soon` button from the Share Store/BNPL preview while retaining its explicit In development status.
+- Removed the dashboard footer disclosure beginning with `Updated`, including its generated client-side timestamp and analytics/inventory explanatory text.
+- Added focused regression assertions for the revised action order and removed elements.
+
+**Product presentation decision:** The dashboard no longer repeats analytics-model and unavailable-inventory disclosure in a bottom footnote. Inventory value remains visibly unavailable in its summary card, and the Share Store/BNPL preview remains labelled In development without a disabled call to action.
+
+**Backend contract gaps and delivery risks:** No new backend contract gap was discovered. Removing the footer makes the summary more compact, but it also removes the on-screen explanation of metric provenance; any future requirement for as-of timestamps or financial qualification should be addressed through a deliberate, approved summary-card treatment rather than silently restoring the removed footer.
+
+**Verification:** Focused dashboard coverage passed with 7 tests. ESLint passed for the changed frontend files, and the TypeScript check passed.
+
+**Next session target:** Continue the planned shared voice-recording integration and dead-CSS cleanup, including review of dashboard styles orphaned by removed elements.
+
+### Session 057 — Voice-first capture design continuation
+
+**Date:** 20 November 2026
+**Outcome:** Reconstructed the paused workflow-design session and completed an interactive design exploration for voice-first sale recording and product creation without changing production screens.
+
+**Agreed product direction:**
+
+- Counter-speed is the primary capture context for the targeted businesses.
+- Voice is the prominent entry mode for sale and product capture; manual entry remains an accessible fallback.
+- AI output remains a draft that the merchant reviews and deliberately confirms before any financial or inventory record is saved.
+- Product creation may additionally begin from an image, subject to the same review-before-save rule and the backend's safe draft contract.
+
+**Design proposal — not yet an implementation approval:**
+
+- Explored Capture → Review → Confirm as three explicit states, with the normal form serving as the correction/review surface rather than competing with voice capture on the entry screen.
+- Produced two interactive mobile directions: a single dominant Focused capture treatment and a Mode dock treatment that makes voice primary while keeping image and manual alternatives visible.
+- Proposed hiding ordinary bottom navigation during the focused capture flow to reduce accidental exits; this detail remains subject to selection and usability review.
+- Used contract-safe example content and preserved the existing separation between drafts and saved records.
+
+**Artifact:** `design-artifacts/voice-first-capture.html`.
+
+**Verification:** The fragment was checked for size and literal markup integrity. Automated browser rendering could not be run because Python and the Windows Python launcher are unavailable in this environment; no browser-level visual or interaction verification is claimed.
+
+**Backend contract gaps:** Existing gaps remain material to implementation: confidence and ambiguous-field handling must remain visible; image creation must preserve draft-only behavior; and final save payload semantics must remain aligned with the received v2 AI contract. No new backend behavior was assumed by the mockup.
+
+**Delivery risk:** Moving voice ahead of the manual form can slow users in noisy shops or when microphone permission fails unless manual fallback is immediate, keyboard accessible and state preserving. The production implementation must also avoid presenting a successful confirmation before the backend acknowledges the write.
+
+**Next session target:** Select Focused capture or Mode dock as the base direction, settle whether bottom navigation is hidden during capture, then turn the selected direction into an implementation plan covering shared capture state, responsive behavior, failure states and focused accessibility tests.
+
+### Session 058 — Focused voice-first sale and product capture
+
+**Date:** 20 November 2026
+**Outcome:** Implemented the selected Focused capture direction for new sales and products while preserving the established draft-review-confirm backend boundary.
+
+**Completed:**
+
+- Made voice capture the default entry state for `/sales/new` and `/products/new`.
+- Added a three-step Capture, Review and Confirm progress treatment with a dominant microphone surface, recording state, realistic prompt examples and reduced-motion support.
+- Kept manual entry immediately available. Selecting manual capture opens the existing complete checkout or product form without creating a second persistence path.
+- Kept typed AI descriptions as an accessibility and device fallback inside the voice flow.
+- Added product-photo capture as a secondary mode and allowed users to move between voice, image and manual entry before saving.
+- Changed successful voice/image draft application to open the normal populated form as the correction and final review surface.
+- Preserved confidence, ambiguity, candidate-match, stock, payment, idempotency and explicit backend-confirmation safeguards already present in the production workflows.
+- Hid the mobile bottom navigation on new-sale and new-product capture routes so the focused workflow is not visually or interactively competing with the global AI launcher. Desktop sidebar navigation remains available.
+- Left product editing and its protected voice-update suggestion workflow unchanged.
+- Added focused coverage for voice-first defaults, manual fallback, product image switching, financial distinctions and focused-shell navigation behavior.
+
+**Verification:** TypeScript passed. The complete frontend suite passed with 52 tests across 17 files. The production PWA build passed with 37 precache entries. ESLint passed for all changed web TypeScript files, and diff hygiene passed.
+
+**Verification limitation:** Repository-wide ESLint remains red on five unrelated stale imports in `BusinessOnboardingPage`, `BusinessSettingsPage` and `SaleDetailPage`. The shared `AppShell` is typechecked and production-built, but the web ESLint configuration ignores files outside its workspace base path, and `packages/ui` does not define its own lint script.
+
+**Product decision:** Focused capture is the selected base direction. New sale and product creation prioritize voice, retain immediate manual fallback, and keep AI output non-authoritative until the merchant reviews the editable form and deliberately submits it. New-product capture additionally exposes image input as a secondary draft source. Mobile bottom navigation is hidden during these two creation workflows; this is a capture-specific presentation rule, not a general navigation change.
+
+**Backend contract gaps:** No new write contract was introduced. Existing confidence/ambiguity semantics, image-draft behavior, candidate resolution and final-save payload requirements remain the governing integration constraints. The frontend still cannot safely bypass form review or treat an AI response as a persisted record.
+
+**Delivery risks and limitations:** Microphone permission, noisy counter environments and unsupported recording APIs can still interrupt the primary path, so manual and typed fallbacks remain essential. Browser-level visual inspection at phone, tablet and desktop widths and a live microphone/image smoke test with a non-sensitive backend workspace remain required before release acceptance.
+
+**Next session target:** Run cross-breakpoint browser QA and live draft smoke tests, then refine spacing or copy only from observed evidence. Follow with the planned shared `useVoiceRecording` integration to remove duplicated recorder lifecycle code without changing the approved workflow.
+
+### Session 060 — Voice-capture waveform and preview refinement
+
+**Date:** 20 November 2026
+**Outcome:** Corrected the recording waveform layout and refined the completed-recording preview used by both sale and product capture.
+
+**Completed:**
+
+- Fixed a CSS specificity conflict that caused waveform bars to inherit the voice hero's grid layout and stack into a vertical line during recording.
+- Kept the waveform as the intended horizontal, animated equalizer; reduced-motion behavior remains supported.
+- Redesigned the completed-recording treatment as a compact review card with a captured-state label, duration/size badge, transcription status indicator, responsive action layout and a less visually heavy audio player treatment.
+
+**Verification:** TypeScript passed. Existing focused sale and product capture regression coverage continues to cover waveform rendering; no behavioral or backend request semantics changed.
+
+**Implementation note:** The embedded audio player's play/pause control remains browser-native for reliable media controls and accessibility. The surrounding review card is product-styled; exact native control chrome varies by browser.
+
+**Next session target:** Run the focused capture screens through live browser/device QA, especially native audio-control appearance and camera/microphone permissions.
+
+### Session 059 — Explicit capture-mode routing and automatic voice start
+
+**Date:** 20 November 2026
+**Outcome:** Separated new-sale and new-product capture into intentional voice, manual and (for products) image paths, so selecting a mode no longer routes every user through the same initial workflow.
+
+**Completed:**
+
+- Added an explicit entry chooser to `/sales/new` and `/products/new`.
+- Made manual selection open the existing checkout or product form directly, without starting a recording workflow.
+- Made voice selection enter a dedicated capture screen with visible waveform feedback and a three-second countdown; the browser microphone request and recording start automatically when the countdown completes.
+- Sent the completed recording to the existing draft endpoint automatically on stop, retaining the recording preview and editable draft review before any normal-form save.
+- Added cancellation during the countdown, typed fallback, and re-recording controls.
+- Made product image selection invoke a file input with `capture="environment"`: supported mobile browsers can offer the rear camera, while desktop browsers retain their normal file picker. The selected image remains in the image-draft review path rather than switching to manual entry.
+- Added regression coverage for chooser separation, manual routing, countdown/waveform state and the mobile camera capture hint.
+
+**Verification:** TypeScript passed. The complete frontend suite passed: 53 tests across 17 files. The production PWA build passed with 37 precache entries.
+
+**Product decision:** The selected capture method determines the immediate workflow: voice starts only after an intentional countdown, manual opens the established form, and product image capture uses the platform-appropriate browser picker. This refines the approved focused-capture direction; it does not change the requirement that AI output is a reviewed draft rather than a saved record.
+
+**Backend contract gap:** The received AI contract accepts completed audio for draft generation, not a streaming transcription session. Accordingly, “transcription begins” means the automated draft request begins after the user stops recording; the interface must not claim live transcription while audio is still being captured.
+
+**Delivery risks and limitations:** `capture="environment"` is a browser hint, not a guarantee that every mobile device opens a rear camera. Camera, microphone and permission behavior still require live iOS, Android and desktop smoke testing. Noisy environments and unsupported recording APIs continue to require the manual and typed alternatives.
+
+**Next session target:** Perform cross-browser device QA with microphone and camera permissions, then consider extracting the duplicated recorder lifecycle into the existing shared hook without changing capture behavior.

@@ -27,7 +27,7 @@ vi.mock('../../lib/api', async (importOriginal) => {
   };
 });
 
-test('keeps booked revenue, received cash and outstanding balance distinct', () => {
+test('separates voice and manual sale capture from the entry choice', () => {
   render(
     <Provider store={store}>
       <MemoryRouter>
@@ -36,12 +36,36 @@ test('keeps booked revenue, received cash and outstanding balance distinct', () 
     </Provider>,
   );
 
+  expect(
+    screen.getByRole('heading', { name: 'How would you like to record this sale?' }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Record with voice' })).toBeInTheDocument();
+  expect(screen.queryByText('Booked revenue')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Type manually' }));
+
   expect(screen.getByText('Booked revenue')).toBeInTheDocument();
   expect(screen.getAllByText('Amount received')).toHaveLength(2);
   expect(screen.getByText('Balance due')).toBeInTheDocument();
   expect(screen.getByText('Record only money already received.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Confirm and record sale' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Start voice recording' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Record with voice' })).not.toBeInTheDocument();
+});
+
+test('shows the voice countdown before requesting microphone access', () => {
+  render(
+    <Provider store={store}>
+      <MemoryRouter>
+        <SaleCheckoutPage />
+      </MemoryRouter>
+    </Provider>,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Record with voice' }));
+
+  expect(screen.getByRole('heading', { name: 'Recording starts in 3' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Starting in 3' })).toBeDisabled();
+  expect(document.querySelector('.focused-capture__wave')).toBeInTheDocument();
 });
 
 test('prepares a non-persisted voice draft before it changes checkout', async () => {
@@ -65,6 +89,8 @@ test('prepares a non-persisted voice draft before it changes checkout', async ()
     </Provider>,
   );
 
+  fireEvent.click(screen.getByRole('button', { name: 'Record with voice' }));
+
   fireEvent.change(screen.getByLabelText('Sale description'), {
     target: { value: 'Musa bought three bags of rice and paid 120k by transfer.' },
   });
@@ -81,5 +107,11 @@ test('prepares a non-persisted voice draft before it changes checkout', async ()
       'No sale has been recorded. Use the normal confirmation button after reviewing the checkout.',
     ),
   ).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Use matching details in checkout' })).toBeDisabled();
+  expect(
+    screen.getByRole('button', { name: 'Review matching details in checkout' }),
+  ).toBeDisabled();
+  expect(screen.queryByText('Booked revenue')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Continue with manual checkout' }));
+  expect(screen.getByText('Booked revenue')).toBeInTheDocument();
 });

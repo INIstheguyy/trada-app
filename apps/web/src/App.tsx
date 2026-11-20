@@ -13,7 +13,7 @@ import {
   useGetMyBusinessQuery,
   useGetSalesAnalyticsQuery,
 } from './lib/api';
-import { formatNaira, localDateKey } from './lib/formatters';
+import { formatNaira } from './lib/formatters';
 
 const LoginPage = lazy(() =>
   import('./features/auth/LoginPage').then(({ LoginPage }) => ({ default: LoginPage })),
@@ -95,7 +95,7 @@ export function App() {
         <Route
           path="/sales/new"
           element={
-            <BusinessScreen action="sale:create" activeNav="sales">
+            <BusinessScreen action="sale:create" activeNav="sales" focusedCapture>
               <SaleCheckoutPage />
             </BusinessScreen>
           }
@@ -119,7 +119,7 @@ export function App() {
         <Route
           path="/products/new"
           element={
-            <BusinessScreen action="product:create" activeNav="products">
+            <BusinessScreen action="product:create" activeNav="products" focusedCapture>
               <ProductFormPage />
             </BusinessScreen>
           }
@@ -159,10 +159,12 @@ function BusinessScreen({
   action,
   activeNav,
   children,
+  focusedCapture = false,
 }: {
   action?: Action;
   activeNav: string;
   children: ReactNode;
+  focusedCapture?: boolean;
 }) {
   const content = action ? (
     <RequirePermission action={action}>{children}</RequirePermission>
@@ -173,22 +175,28 @@ function BusinessScreen({
   return (
     <ProtectedRoute>
       <RequireBusiness>
-        <AuthenticatedShell activeNav={activeNav}>{content}</AuthenticatedShell>
+        <AuthenticatedShell activeNav={activeNav} focusedCapture={focusedCapture}>
+          {content}
+        </AuthenticatedShell>
       </RequireBusiness>
     </ProtectedRoute>
   );
 }
 
-function AuthenticatedShell({ children, activeNav }: { children: ReactNode; activeNav: string }) {
+function AuthenticatedShell({
+  children,
+  activeNav,
+  focusedCapture,
+}: {
+  children: ReactNode;
+  activeNav: string;
+  focusedCapture: boolean;
+}) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const user = useAppSelector((state) => state.auth.user);
   const { data: business } = useGetMyBusinessQuery();
-  const today = localDateKey(new Date());
-  const briefingAnalytics = useGetSalesAnalyticsQuery(
-    { startDate: today, endDate: today },
-    { skip: activeNav !== 'home' },
-  );
+  const briefingAnalytics = useGetSalesAnalyticsQuery({}, { skip: activeNav !== 'home' });
   const briefingStock = useGetLowStockProductsQuery(undefined, { skip: activeNav !== 'home' });
   const fullName = user ? `${user.firstName} ${user.lastName}` : 'Trada user';
   const role = normalizeRole(user?.role ?? 'user');
@@ -216,26 +224,27 @@ function AuthenticatedShell({ children, activeNav }: { children: ReactNode; acti
         ]
       : []),
   ];
-  const aiBriefing = activeNav === 'home'
-    ? {
-        title: 'Your business briefing',
-        summary: buildBusinessBriefing(
-          briefingAnalytics.data?.totalSalesCount,
-          briefingAnalytics.data?.totalRevenue,
-          briefingStock.data?.length,
-        ),
-        status:
-          briefingAnalytics.isError || briefingStock.isError
-            ? 'Partial recorded data'
-            : briefingAnalytics.isLoading || briefingStock.isLoading
-              ? 'Preparing briefing'
-              : 'From recorded data',
-        meta: `Today · ${new Intl.DateTimeFormat('en-NG', {
-          hour: 'numeric',
-          minute: '2-digit',
-        }).format(new Date())}`,
-      }
-    : undefined;
+  const aiBriefing =
+    activeNav === 'home'
+      ? {
+          title: 'Your business briefing',
+          summary: buildBusinessBriefing(
+            briefingAnalytics.data?.totalSalesCount,
+            briefingAnalytics.data?.totalRevenue,
+            briefingStock.data?.length,
+          ),
+          status:
+            briefingAnalytics.isError || briefingStock.isError
+              ? 'Partial recorded data'
+              : briefingAnalytics.isLoading || briefingStock.isLoading
+                ? 'Preparing briefing'
+                : 'From recorded data',
+          meta: `Today · ${new Intl.DateTimeFormat('en-NG', {
+            hour: 'numeric',
+            minute: '2-digit',
+          }).format(new Date())}`,
+        }
+      : undefined;
 
   function handleSignOut() {
     dispatch(signedOut());
@@ -254,6 +263,7 @@ function AuthenticatedShell({ children, activeNav }: { children: ReactNode; acti
       onNavigate={(href) => navigate(href)}
       onSignOut={handleSignOut}
       activeNav={activeNav}
+      hideMobileNavigation={focusedCapture}
     >
       {children}
     </AppShell>
@@ -282,4 +292,3 @@ function buildBusinessBriefing(
         : `${stockCount} ${stockCount === 1 ? 'product needs' : 'products need'} restocking.`;
   return `${salesSummary} ${stockSummary}`;
 }
-

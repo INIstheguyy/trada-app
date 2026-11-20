@@ -43,6 +43,17 @@ test('opens an account menu before signing out', () => {
   expect(onSignOut).toHaveBeenCalledOnce();
 });
 
+test('hides mobile navigation during a focused capture workflow', () => {
+  render(
+    <AppShell hideMobileNavigation>
+      <p>Focused capture</p>
+    </AppShell>,
+  );
+
+  expect(screen.queryByRole('navigation', { name: 'Mobile navigation' })).not.toBeInTheDocument();
+  expect(screen.getByText('Focused capture')).toBeInTheDocument();
+});
+
 test('opens the central AI voice launcher and routes only to draft-safe workflows', () => {
   const onNavigate = vi.fn();
   render(
@@ -76,11 +87,15 @@ test('opens the central AI voice launcher and routes only to draft-safe workflow
     </AppShell>,
   );
 
-  fireEvent.click(screen.getByRole('button', { name: 'Open AI voice assistant' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Open AI assistant' }));
   expect(screen.getByRole('dialog')).toHaveTextContent('What would you like to capture?');
   expect(screen.getByRole('dialog')).toHaveTextContent('Your business briefing');
   expect(screen.getByRole('dialog')).toHaveTextContent('Two sales were recorded today.');
-  expect(screen.getByText('Voice results are drafts. You review and confirm every sale or product yourself.')).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      'Voice results are drafts. You review and confirm every sale or product yourself.',
+    ),
+  ).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('link', { name: /Record a sale by voice/ }));
   expect(onNavigate).toHaveBeenCalledWith('/sales/new?ai=voice');

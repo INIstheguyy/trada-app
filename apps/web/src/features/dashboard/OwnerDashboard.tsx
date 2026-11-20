@@ -7,7 +7,6 @@ import {
   CalendarDays,
   ChartNoAxesColumnIncreasing,
   ChevronDown,
-  Clock3,
   LoaderCircle,
   PackagePlus,
   ReceiptText,
@@ -112,10 +111,6 @@ export function OwnerDashboard({ firstName = 'there' }: { firstName?: string }) 
       value: analytics.data?.unpaidBalance ?? null,
     },
   ];
-  const asOf = new Intl.DateTimeFormat('en-NG', {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date());
   const stockCount = lowStock.data?.length;
 
   return (
@@ -223,9 +218,6 @@ export function OwnerDashboard({ firstName = 'there' }: { firstName?: string }) 
             </div>
           </div>
           <div className="dashboard-quick-grid">
-            <QuickAction icon={ReceiptText} label="Record sale" to="/sales/new" />
-            <QuickAction icon={PackagePlus} label="Add product" to="/products/new" />
-            <QuickAction icon={Box} label="Inventory" to="/products" />
             <button
               className={`dashboard-quick-action${lowStockOpen ? ' is-active' : ''}`}
               type="button"
@@ -239,6 +231,9 @@ export function OwnerDashboard({ firstName = 'there' }: { firstName?: string }) 
               </span>
               <strong>Low stock</strong>
             </button>
+            <QuickAction icon={PackagePlus} label="Add product" to="/products/new" />
+            <QuickAction icon={Box} label="Inventory" to="/products" />
+            <QuickAction icon={ReceiptText} label="Record sale" to="/sales/new" />
           </div>
 
           {lowStockOpen && (
@@ -301,9 +296,6 @@ export function OwnerDashboard({ firstName = 'there' }: { firstName?: string }) 
             <h2 id="store-preview-title">Share your store</h2>
             <p>Your BNPL-powered online storefront is being prepared.</p>
           </div>
-          <button type="button" disabled>
-            Coming soon
-          </button>
         </section>
       </div>
 
@@ -353,10 +345,6 @@ export function OwnerDashboard({ firstName = 'there' }: { firstName?: string }) 
         )}
       </Surface>
 
-      <p className="dashboard__footnote">
-        <Clock3 aria-hidden="true" size={14} /> Updated {asOf}. Revenue, gross profit and unpaid
-        balances use the backend analytics model; inventory value is not yet available.
-      </p>
     </div>
   );
 }
@@ -419,6 +407,8 @@ function getGreeting(date: Date) {
 }
 
 function getDateRange(period: DashboardPeriod, endDateKey: string) {
+  if (period === 'today') return {};
+
   const endDate = new Date(`${endDateKey}T12:00:00`);
   const startDate = new Date(endDate);
   const option = periodOptions.find((item) => item.value === period);

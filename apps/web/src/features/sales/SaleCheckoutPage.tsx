@@ -1,7 +1,7 @@
 import { Alert, Button, FormField, Input, PageHeader, Select, Surface, Textarea } from '@trada/ui';
 import {
-  ArrowLeft,
   FilePenLine,
+  Keyboard,
   Mic,
   Minus,
   Plus,
@@ -11,8 +11,13 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router';
-import { formatNaira, formatFileSize, formatRecordingDuration, recordingToDataUrl } from '../../lib/formatters';
+import { useNavigate, useSearchParams } from 'react-router';
+import {
+  formatNaira,
+  formatFileSize,
+  formatRecordingDuration,
+  recordingToDataUrl,
+} from '../../lib/formatters';
 import { BackLink } from '../../components/BackLink';
 import { TextField } from '../../components/FormFields';
 import { readApiError } from '../../lib/apiError';
@@ -39,6 +44,11 @@ const maxAudioDurationSeconds = 60;
 export function SaleCheckoutPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const voiceRequested = searchParams.get('ai') === 'voice';
+  const [captureMode, setCaptureMode] = useState<'choose' | 'voice' | 'manual'>(
+    voiceRequested ? 'voice' : 'choose',
+  );
+  const [voiceCountdown, setVoiceCountdown] = useState<number | null>(voiceRequested ? 3 : null);
   const {
     data: productsData,
     isLoading: isLoadingProducts,
@@ -88,6 +98,22 @@ export function SaleCheckoutPage() {
   );
 
   useEffect(() => {
+    if (captureMode !== 'voice' || voiceCountdown === null) return;
+    if (voiceCountdown === 0) {
+      setVoiceCountdown(null);
+      void startVoiceRecording();
+      return;
+    }
+    const timer = window.setTimeout(
+      () => setVoiceCountdown((current) => (current === null ? null : current - 1)),
+      1000,
+    );
+    return () => window.clearTimeout(timer);
+    // startVoiceRecording intentionally runs only when the explicit countdown reaches zero.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [captureMode, voiceCountdown]);
+
+  useEffect(() => {
     if (!isRecordingVoice) return;
     const timer = window.setInterval(() => {
       setRecordingElapsedSeconds(
@@ -132,7 +158,7 @@ export function SaleCheckoutPage() {
   );
   const draftNeedsManualReview =
     Boolean(voiceDraft?.ambiguousFields?.length) ||
-    voiceDraft?.confidence?.overall != null && voiceDraft.confidence.overall < 0.85;
+    (voiceDraft?.confidence?.overall != null && voiceDraft.confidence.overall < 0.85);
   const canApplyVoiceDraft =
     Boolean(voiceDraft) &&
     items.length === 0 &&
@@ -236,6 +262,7 @@ export function SaleCheckoutPage() {
           mimeType: recording.type || 'audio/webm',
           url,
         });
+        prepareCapturedAudio(recording, durationSeconds, recording.type || 'audio/webm');
       });
       recorder.start();
       setIsRecordingVoice(true);
@@ -250,25 +277,29 @@ export function SaleCheckoutPage() {
     if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
   }
 
+  function chooseVoiceCapture() {
+    setVoiceError(undefined);
+    setVoiceDraft(undefined);
+    setCaptureMode('voice');
+    setVoiceCountdown(3);
+  }
+
   function discardAudioPreview() {
     if (audioPreviewUrlRef.current) URL.revokeObjectURL(audioPreviewUrlRef.current);
     audioPreviewUrlRef.current = null;
     setAudioPreview(undefined);
   }
 
-  function prepareAudioVoiceDraft() {
-    if (!audioPreview) return;
-    if (audioPreview.durationSeconds > maxAudioDurationSeconds) {
+  function prepareCapturedAudio(recording: Blob, durationSeconds: number, mimeType: string) {
+    if (durationSeconds > maxAudioDurationSeconds) {
       setVoiceError('Keep voice recordings to 60 seconds or less, then try again.');
       return;
     }
-    if (audioPreview.blob.size > maxAudioBytes) {
+    if (recording.size > maxAudioBytes) {
       setVoiceError('Keep voice recordings to 10 MB or less, then try again.');
       return;
     }
-    void recordingToDataUrl(audioPreview.blob).then((audio) =>
-      generateVoiceDraft({ audio, mimeType: audioPreview.mimeType }),
-    );
+    void recordingToDataUrl(recording).then((audio) => generateVoiceDraft({ audio, mimeType }));
   }
 
   function prepareTypedVoiceDraft() {
@@ -310,6 +341,7 @@ export function SaleCheckoutPage() {
     saleIdempotencyKeyRef.current = voiceDraft.draft?.idempotencyKey;
     setVoiceDraft(undefined);
     setVoiceError(undefined);
+    setCaptureMode('manual');
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -372,103 +404,216 @@ export function SaleCheckoutPage() {
       <PageHeader
         eyebrow="New receipt"
         title="Record a sale"
-        description="Build the cart, confirm payment received and review any outstanding balance before saving."
+        description={
+          captureMode === 'choose'
+            ? 'Choose how you want to record this sale.'
+            : captureMode === 'voice'
+              ? 'Speak naturally and let Trada prepare a sale draft for you to review.'
+              : 'Review the cart, payment received and any outstanding balance before saving.'
+        }
       />
-      <form className="checkout-layout" onSubmit={handleSubmit}>
+      <form
+        className={`checkout-layout${captureMode !== 'manual' ? ' checkout-layout--capture' : ''}`}
+        onSubmit={handleSubmit}
+      >
         <div className="checkout-main">
           {error && <Alert tone="error">{error}</Alert>}
-          <section
-            className="voice-entry-target"
-            ref={voiceEntryRef}
-            tabIndex={-1}
-            aria-label="AI voice sale capture"
-          >
-            <Surface className="checkout-section voice-draft-entry">
-            <div className="form-section-heading">
-              <h2>Record sale by voice</h2>
-              <p>
-                Record the sale in your own words. Trada prepares a draft; nothing is recorded yet.
-              </p>
-            </div>
-            <div className="voice-draft-entry__actions">
-              <Button
-                type="button"
-                variant="secondary"
-                loading={voiceDraftState.isLoading && !isRecordingVoice}
-                onClick={() =>
-                  isRecordingVoice ? stopVoiceRecording() : void startVoiceRecording()
-                }
-                icon={
-                  isRecordingVoice ? (
-                    <Square aria-hidden="true" size={16} fill="currentColor" />
-                  ) : (
-                    <Mic aria-hidden="true" size={17} />
-                  )
-                }
-              >
-                {isRecordingVoice ? 'Stop and prepare draft' : 'Start voice recording'}
-              </Button>
-              <small>
-                {isRecordingVoice
-                  ? `Recording ${formatRecordingDuration(recordingElapsedSeconds)} â€” tap stop when you have finished speaking.`
-                  : 'AI drafts do not create a sale. Review before using any detail below.'}
-              </small>
-            </div>
-            {audioPreview && (
-              <div className="voice-recording-preview" aria-live="polite">
-                <div>
-                  <strong>Recording ready</strong>
+          {captureMode === 'choose' && (
+            <Surface className="checkout-section capture-mode-picker">
+              <div className="capture-mode-picker__heading">
+                <span>Choose a recording method</span>
+                <h2>How would you like to record this sale?</h2>
+                <p>Voice is fastest at the counter. You can still type every detail manually.</p>
+              </div>
+              <div className="capture-mode-picker__options">
+                <button
+                  className="capture-mode-card capture-mode-card--primary"
+                  type="button"
+                  aria-label="Record with voice"
+                  onClick={chooseVoiceCapture}
+                >
                   <span>
-                    {formatRecordingDuration(audioPreview.durationSeconds)} Â·{' '}
-                    {formatFileSize(audioPreview.blob.size)}
+                    <Mic aria-hidden="true" size={24} />
                   </span>
+                  <strong>Record with voice</strong>
+                  <small>Starts recording after a 3-second countdown</small>
+                </button>
+                <button
+                  className="capture-mode-card"
+                  type="button"
+                  aria-label="Type manually"
+                  onClick={() => setCaptureMode('manual')}
+                >
+                  <span>
+                    <Keyboard aria-hidden="true" size={24} />
+                  </span>
+                  <strong>Type manually</strong>
+                  <small>Open the existing sale form</small>
+                </button>
+              </div>
+            </Surface>
+          )}
+          {captureMode === 'voice' && (
+            <section
+              className="voice-entry-target"
+              ref={voiceEntryRef}
+              tabIndex={-1}
+              aria-label="AI voice sale capture"
+            >
+              <Surface className="checkout-section voice-draft-entry focused-capture">
+                <ol className="focused-capture__progress" aria-label="Sale capture progress">
+                  <li className={!voiceDraft ? 'is-active' : ''}>
+                    <span>1</span> Capture
+                  </li>
+                  <li className={voiceDraft ? 'is-active' : ''}>
+                    <span>2</span> Review
+                  </li>
+                  <li>
+                    <span>3</span> Confirm
+                  </li>
+                </ol>
+                <div className="focused-capture__hero">
+                  <span
+                    className={`focused-capture__orb${isRecordingVoice ? ' is-listening' : ''}`}
+                  >
+                    {isRecordingVoice ? (
+                      <Square aria-hidden="true" size={28} fill="currentColor" />
+                    ) : (
+                      <Mic aria-hidden="true" size={32} />
+                    )}
+                  </span>
+                  <div>
+                    <h2>
+                      {voiceCountdown !== null
+                        ? `Recording starts in ${voiceCountdown}`
+                        : isRecordingVoice
+                          ? 'Listening to your sale'
+                          : voiceDraftState.isLoading
+                            ? 'Transcribing your sale'
+                            : 'Tell Trada about the sale'}
+                    </h2>
+                    <p>
+                      {voiceCountdown !== null
+                        ? 'Get ready to speak naturally when the countdown finishes.'
+                        : isRecordingVoice
+                          ? 'Include the product, quantity, payment method and customer name.'
+                          : 'Speak naturally. Trada prepares an editable draft; nothing is recorded yet.'}
+                    </p>
+                  </div>
+                  {voiceCountdown === null && !isRecordingVoice && (
+                    <p className="focused-capture__example">
+                      “Four spanners, cash, sold to Biodun.”
+                    </p>
+                  )}
+                  {(voiceCountdown !== null || isRecordingVoice) && (
+                    <div className="focused-capture__wave" aria-hidden="true">
+                      {Array.from({ length: 11 }, (_, index) => (
+                        <span key={index} />
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <audio controls preload="metadata" src={audioPreview.url}>
-                  Your browser cannot play this recording.
-                </audio>
-                <div className="voice-recording-preview__actions">
+                <div className="voice-draft-entry__actions">
                   <Button
                     type="button"
-                    variant="secondary"
-                    loading={voiceDraftState.isLoading}
-                    onClick={prepareAudioVoiceDraft}
+                    loading={
+                      voiceDraftState.isLoading && !isRecordingVoice && voiceCountdown === null
+                    }
+                    disabled={voiceCountdown !== null}
+                    onClick={() => (isRecordingVoice ? stopVoiceRecording() : chooseVoiceCapture())}
+                    icon={
+                      isRecordingVoice ? (
+                        <Square aria-hidden="true" size={16} fill="currentColor" />
+                      ) : (
+                        <Mic aria-hidden="true" size={17} />
+                      )
+                    }
                   >
-                    Prepare audio draft
+                    {voiceCountdown !== null
+                      ? `Starting in ${voiceCountdown}`
+                      : isRecordingVoice
+                        ? 'Stop and transcribe'
+                        : 'Record again'}
                   </Button>
-                  <Button type="button" variant="ghost" onClick={discardAudioPreview}>
-                    Discard recording
+                  <small>
+                    {isRecordingVoice
+                      ? `Recording ${formatRecordingDuration(recordingElapsedSeconds)} â€” tap stop when you have finished speaking.`
+                      : 'AI drafts do not create a sale. Review before using any detail below.'}
+                  </small>
+                </div>
+                {audioPreview && (
+                  <div className="voice-recording-preview" aria-live="polite">
+                    <div className="voice-recording-preview__header">
+                      <div>
+                        <strong>Recording captured</strong>
+                        <span>Ready for draft review</span>
+                      </div>
+                      <span className="voice-recording-preview__meta">
+                        {formatRecordingDuration(audioPreview.durationSeconds)} Â·{' '}
+                        {formatFileSize(audioPreview.blob.size)}
+                      </span>
+                    </div>
+                    <audio controls preload="metadata" src={audioPreview.url}>
+                      Your browser cannot play this recording.
+                    </audio>
+                    <div className="voice-recording-preview__actions">
+                      <span className="voice-recording-preview__status" role="status">
+                        {voiceDraftState.isLoading
+                          ? 'Transcribing recordingâ€¦'
+                          : 'Recording sent for transcription.'}
+                      </span>
+                      <Button type="button" variant="ghost" onClick={discardAudioPreview}>
+                        Discard recording
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                <details className="voice-draft-entry__fallback">
+                  <summary>Canâ€™t record? Type a sale description instead</summary>
+                  <FormField
+                    htmlFor="voice-sale-transcript"
+                    label="Sale description"
+                    hint="For example: Musa bought 3 bags of rice and paid 120k by transfer."
+                  >
+                    <Textarea
+                      id="voice-sale-transcript"
+                      rows={3}
+                      value={voiceTranscript}
+                      onChange={(event) => setVoiceTranscript(event.target.value)}
+                      placeholder="Describe the items, payment and customer details"
+                    />
+                  </FormField>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    loading={voiceDraftState.isLoading}
+                    onClick={prepareTypedVoiceDraft}
+                    icon={<FilePenLine aria-hidden="true" size={17} />}
+                  >
+                    Prepare typed draft
+                  </Button>
+                </details>
+                {voiceError && <Alert tone="warning">{voiceError}</Alert>}
+                <div className="focused-capture__alternatives">
+                  {voiceCountdown !== null && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        setVoiceCountdown(null);
+                        setCaptureMode('choose');
+                      }}
+                    >
+                      Cancel countdown
+                    </Button>
+                  )}
+                  <Button type="button" variant="ghost" onClick={() => setCaptureMode('manual')}>
+                    Type sale manually
                   </Button>
                 </div>
-              </div>
-            )}
-            <details className="voice-draft-entry__fallback">
-              <summary>Canâ€™t record? Type a sale description instead</summary>
-              <FormField
-                htmlFor="voice-sale-transcript"
-                label="Sale description"
-                hint="For example: Musa bought 3 bags of rice and paid 120k by transfer."
-              >
-                <Textarea
-                  id="voice-sale-transcript"
-                  rows={3}
-                  value={voiceTranscript}
-                  onChange={(event) => setVoiceTranscript(event.target.value)}
-                  placeholder="Describe the items, payment and customer details"
-                />
-              </FormField>
-              <Button
-                type="button"
-                variant="ghost"
-                loading={voiceDraftState.isLoading}
-                onClick={prepareTypedVoiceDraft}
-                icon={<FilePenLine aria-hidden="true" size={17} />}
-              >
-                Prepare typed draft
-              </Button>
-            </details>
-            {voiceError && <Alert tone="warning">{voiceError}</Alert>}
-            </Surface>
-          </section>
+              </Surface>
+            </section>
+          )}
 
           {voiceDraft && (
             <Surface className="checkout-section voice-draft-review" aria-live="polite">
@@ -508,8 +653,11 @@ export function SaleCheckoutPage() {
                       </span>
                       {item.candidateMatches?.length ? (
                         <small>
-                          Alternatives: {item.candidateMatches.map((candidate) => candidate.productName).join(', ')}.
-                          Review these against the recognised primary product before continuing.
+                          Alternatives:{' '}
+                          {item.candidateMatches
+                            .map((candidate) => candidate.productName)
+                            .join(', ')}
+                          . Review these against the recognised primary product before continuing.
                         </small>
                       ) : null}
                     </li>
@@ -539,304 +687,323 @@ export function SaleCheckoutPage() {
               )}
               <div className="voice-draft-review__actions">
                 <Button type="button" onClick={applyVoiceDraft} disabled={!canApplyVoiceDraft}>
-                  Use matching details in checkout
+                  Review matching details in checkout
                 </Button>
+                {!canApplyVoiceDraft && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setCaptureMode('manual')}
+                  >
+                    Continue with manual checkout
+                  </Button>
+                )}
                 <Button type="button" variant="ghost" onClick={() => setVoiceDraft(undefined)}>
                   Discard draft
                 </Button>
               </div>
             </Surface>
           )}
-          <Surface className="checkout-section">
-            <div className="form-section-heading">
-              <h2>Products</h2>
-              <p>Stock is deducted only after the backend confirms the sale.</p>
-            </div>
-            {productsFailed && (
-              <Alert tone="warning">
-                Products could not be loaded.{' '}
+          {captureMode === 'manual' && (
+            <>
+              <Surface className="checkout-section">
+                <div className="form-section-heading">
+                  <h2>Products</h2>
+                  <p>Stock is deducted only after the backend confirms the sale.</p>
+                </div>
+                {productsFailed && (
+                  <Alert tone="warning">
+                    Products could not be loaded.{' '}
+                    <button
+                      className="text-action"
+                      type="button"
+                      onClick={() => void refetchProducts()}
+                    >
+                      Try again
+                    </button>
+                  </Alert>
+                )}
+                <div className="product-picker">
+                  <Select
+                    aria-label="Choose product"
+                    value={selectedProductId}
+                    onChange={(event) => setSelectedProductId(event.target.value)}
+                    disabled={isLoadingProducts}
+                  >
+                    <option value="">
+                      {isLoadingProducts ? 'Loading products…' : 'Choose a product'}
+                    </option>
+                    {productsData?.products.map((product) => (
+                      <option
+                        key={product.id}
+                        value={product.id}
+                        disabled={product.type === 'inventory_based' && product.quantity <= 0}
+                      >
+                        {product.name} · {formatNaira.format(product.sellingPrice)} ·{' '}
+                        {product.quantity} {product.unit}
+                      </option>
+                    ))}
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={addProduct}
+                    disabled={!selectedProductId}
+                    icon={<Plus aria-hidden="true" size={17} />}
+                  >
+                    Add
+                  </Button>
+                </div>
+                {items.length === 0 ? (
+                  <div className="empty-cart">
+                    <ShoppingCart aria-hidden="true" size={25} />
+                    <p>No products added yet.</p>
+                  </div>
+                ) : (
+                  <div className="cart-items">
+                    {items.map((item) => (
+                      <article className="cart-item" key={item.product.id}>
+                        <div className="cart-item__name">
+                          <strong>{item.product.name}</strong>
+                          <small>
+                            {item.product.quantity} {item.product.unit} available
+                          </small>
+                        </div>
+                        <label>
+                          <span>Qty</span>
+                          <div className="quantity-control">
+                            <button
+                              type="button"
+                              aria-label={`Reduce ${item.product.name}`}
+                              onClick={() =>
+                                updateItem(item.product.id, {
+                                  quantity: Math.max(1, item.quantity - 1),
+                                })
+                              }
+                            >
+                              <Minus aria-hidden="true" size={14} />
+                            </button>
+                            <Input
+                              aria-label={`${item.product.name} quantity`}
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(event) =>
+                                updateItem(item.product.id, {
+                                  quantity: Math.max(1, Number(event.target.value)),
+                                })
+                              }
+                            />
+                            <button
+                              type="button"
+                              aria-label={`Increase ${item.product.name}`}
+                              onClick={() =>
+                                updateItem(item.product.id, { quantity: item.quantity + 1 })
+                              }
+                            >
+                              <Plus aria-hidden="true" size={14} />
+                            </button>
+                          </div>
+                        </label>
+                        <label>
+                          <span>Unit price</span>
+                          <Input
+                            aria-label={`${item.product.name} unit price`}
+                            type="number"
+                            min="0"
+                            value={item.unitPrice}
+                            onChange={(event) =>
+                              updateItem(item.product.id, { unitPrice: Number(event.target.value) })
+                            }
+                          />
+                        </label>
+                        <label>
+                          <span>Item discount</span>
+                          <Input
+                            aria-label={`${item.product.name} item discount`}
+                            type="number"
+                            min="0"
+                            value={item.discountAmount}
+                            onChange={(event) =>
+                              updateItem(item.product.id, {
+                                discountAmount: Number(event.target.value),
+                              })
+                            }
+                          />
+                        </label>
+                        <strong className="cart-item__total">
+                          {formatNaira.format(item.unitPrice * item.quantity - item.discountAmount)}
+                        </strong>
+                        <button
+                          className="cart-remove"
+                          type="button"
+                          onClick={() =>
+                            setItems((current) =>
+                              current.filter(
+                                (candidate) => candidate.product.id !== item.product.id,
+                              ),
+                            )
+                          }
+                          aria-label={`Remove ${item.product.name}`}
+                        >
+                          <Trash2 aria-hidden="true" size={16} />
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </Surface>
+
+              <Surface className="checkout-section">
+                <div className="form-section-heading">
+                  <h2>Customer</h2>
+                  <p>Optional for walk-in sales; required operationally for credit follow-up.</p>
+                </div>
+                <div className="form-grid">
+                  <TextField
+                    id="customer-name"
+                    label="Customer name"
+                    value={customerName}
+                    onChange={setCustomerName}
+                  />
+                  <TextField
+                    id="customer-phone"
+                    label="Phone number"
+                    value={customerPhone}
+                    onChange={setCustomerPhone}
+                    type="tel"
+                  />
+                  <TextField
+                    id="customer-email"
+                    label="Email"
+                    value={customerEmail}
+                    onChange={setCustomerEmail}
+                    type="email"
+                  />
+                  <FormField
+                    className="product-form-field--wide"
+                    htmlFor="sale-notes"
+                    label="Notes"
+                  >
+                    <Textarea
+                      id="sale-notes"
+                      rows={3}
+                      value={notes}
+                      onChange={(event) => setNotes(event.target.value)}
+                    />
+                  </FormField>
+                </div>
+              </Surface>
+            </>
+          )}
+        </div>
+
+        {captureMode === 'manual' && (
+          <aside className="checkout-summary">
+            <Surface className="checkout-section">
+              <div className="form-section-heading">
+                <h2>Payment</h2>
+                <p>Revenue and money received are recorded separately.</p>
+              </div>
+              <div className="checkout-payment">
+                <FormField htmlFor="payment-method" label="Payment method" required>
+                  <Select
+                    id="payment-method"
+                    value={paymentMethod}
+                    onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="pos">POS</option>
+                    <option value="transfer">Transfer</option>
+                    <option value="credit">Credit</option>
+                    <option value="split">Split</option>
+                  </Select>
+                </FormField>
+                <FormField
+                  htmlFor="amount-paid"
+                  label="Amount received"
+                  required
+                  hint="Record only money already received."
+                >
+                  <Input
+                    id="amount-paid"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={amountPaid}
+                    onChange={(event) => setAmountPaid(Number(event.target.value))}
+                    aria-describedby="amount-paid-hint"
+                  />
+                </FormField>
                 <button
                   className="text-action"
                   type="button"
-                  onClick={() => void refetchProducts()}
+                  onClick={() => setAmountPaid(totalAmount)}
                 >
-                  Try again
+                  Mark fully paid
                 </button>
-              </Alert>
-            )}
-            <div className="product-picker">
-              <Select
-                aria-label="Choose product"
-                value={selectedProductId}
-                onChange={(event) => setSelectedProductId(event.target.value)}
-                disabled={isLoadingProducts}
-              >
-                <option value="">
-                  {isLoadingProducts ? 'Loading products…' : 'Choose a product'}
-                </option>
-                {productsData?.products.map((product) => (
-                  <option
-                    key={product.id}
-                    value={product.id}
-                    disabled={product.type === 'inventory_based' && product.quantity <= 0}
-                  >
-                    {product.name} · {formatNaira.format(product.sellingPrice)} · {product.quantity}{' '}
-                    {product.unit}
-                  </option>
-                ))}
-              </Select>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={addProduct}
-                disabled={!selectedProductId}
-                icon={<Plus aria-hidden="true" size={17} />}
-              >
-                Add
-              </Button>
-            </div>
-            {items.length === 0 ? (
-              <div className="empty-cart">
-                <ShoppingCart aria-hidden="true" size={25} />
-                <p>No products added yet.</p>
+                <FormField htmlFor="sale-discount" label="Sale discount">
+                  <Input
+                    id="sale-discount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={discountAmount}
+                    onChange={(event) => setDiscountAmount(Number(event.target.value))}
+                  />
+                </FormField>
+                <FormField htmlFor="sale-tax" label="Tax">
+                  <Input
+                    id="sale-tax"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={taxAmount}
+                    onChange={(event) => setTaxAmount(Number(event.target.value))}
+                  />
+                </FormField>
               </div>
-            ) : (
-              <div className="cart-items">
-                {items.map((item) => (
-                  <article className="cart-item" key={item.product.id}>
-                    <div className="cart-item__name">
-                      <strong>{item.product.name}</strong>
-                      <small>
-                        {item.product.quantity} {item.product.unit} available
-                      </small>
-                    </div>
-                    <label>
-                      <span>Qty</span>
-                      <div className="quantity-control">
-                        <button
-                          type="button"
-                          aria-label={`Reduce ${item.product.name}`}
-                          onClick={() =>
-                            updateItem(item.product.id, {
-                              quantity: Math.max(1, item.quantity - 1),
-                            })
-                          }
-                        >
-                          <Minus aria-hidden="true" size={14} />
-                        </button>
-                        <Input
-                          aria-label={`${item.product.name} quantity`}
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(event) =>
-                            updateItem(item.product.id, {
-                              quantity: Math.max(1, Number(event.target.value)),
-                            })
-                          }
-                        />
-                        <button
-                          type="button"
-                          aria-label={`Increase ${item.product.name}`}
-                          onClick={() =>
-                            updateItem(item.product.id, { quantity: item.quantity + 1 })
-                          }
-                        >
-                          <Plus aria-hidden="true" size={14} />
-                        </button>
-                      </div>
-                    </label>
-                    <label>
-                      <span>Unit price</span>
-                      <Input
-                        aria-label={`${item.product.name} unit price`}
-                        type="number"
-                        min="0"
-                        value={item.unitPrice}
-                        onChange={(event) =>
-                          updateItem(item.product.id, { unitPrice: Number(event.target.value) })
-                        }
-                      />
-                    </label>
-                    <label>
-                      <span>Item discount</span>
-                      <Input
-                        aria-label={`${item.product.name} item discount`}
-                        type="number"
-                        min="0"
-                        value={item.discountAmount}
-                        onChange={(event) =>
-                          updateItem(item.product.id, {
-                            discountAmount: Number(event.target.value),
-                          })
-                        }
-                      />
-                    </label>
-                    <strong className="cart-item__total">
-                      {formatNaira.format(item.unitPrice * item.quantity - item.discountAmount)}
-                    </strong>
-                    <button
-                      className="cart-remove"
-                      type="button"
-                      onClick={() =>
-                        setItems((current) =>
-                          current.filter((candidate) => candidate.product.id !== item.product.id),
-                        )
-                      }
-                      aria-label={`Remove ${item.product.name}`}
-                    >
-                      <Trash2 aria-hidden="true" size={16} />
-                    </button>
-                  </article>
-                ))}
+            </Surface>
+            <Surface className="sale-totals">
+              <div>
+                <span>Items subtotal</span>
+                <strong>{formatNaira.format(subtotal)}</strong>
               </div>
-            )}
-          </Surface>
-
-          <Surface className="checkout-section">
-            <div className="form-section-heading">
-              <h2>Customer</h2>
-              <p>Optional for walk-in sales; required operationally for credit follow-up.</p>
-            </div>
-            <div className="form-grid">
-              <TextField
-                id="customer-name"
-                label="Customer name"
-                value={customerName}
-                onChange={setCustomerName}
-              />
-              <TextField
-                id="customer-phone"
-                label="Phone number"
-                value={customerPhone}
-                onChange={setCustomerPhone}
-                type="tel"
-              />
-              <TextField
-                id="customer-email"
-                label="Email"
-                value={customerEmail}
-                onChange={setCustomerEmail}
-                type="email"
-              />
-              <FormField className="product-form-field--wide" htmlFor="sale-notes" label="Notes">
-                <Textarea
-                  id="sale-notes"
-                  rows={3}
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                />
-              </FormField>
-            </div>
-          </Surface>
-        </div>
-
-        <aside className="checkout-summary">
-          <Surface className="checkout-section">
-            <div className="form-section-heading">
-              <h2>Payment</h2>
-              <p>Revenue and money received are recorded separately.</p>
-            </div>
-            <div className="checkout-payment">
-              <FormField htmlFor="payment-method" label="Payment method" required>
-                <Select
-                  id="payment-method"
-                  value={paymentMethod}
-                  onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
-                >
-                  <option value="cash">Cash</option>
-                  <option value="pos">POS</option>
-                  <option value="transfer">Transfer</option>
-                  <option value="credit">Credit</option>
-                  <option value="split">Split</option>
-                </Select>
-              </FormField>
-              <FormField
-                htmlFor="amount-paid"
-                label="Amount received"
-                required
-                hint="Record only money already received."
-              >
-                <Input
-                  id="amount-paid"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={amountPaid}
-                  onChange={(event) => setAmountPaid(Number(event.target.value))}
-                  aria-describedby="amount-paid-hint"
-                />
-              </FormField>
-              <button
-                className="text-action"
-                type="button"
-                onClick={() => setAmountPaid(totalAmount)}
-              >
-                Mark fully paid
-              </button>
-              <FormField htmlFor="sale-discount" label="Sale discount">
-                <Input
-                  id="sale-discount"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={discountAmount}
-                  onChange={(event) => setDiscountAmount(Number(event.target.value))}
-                />
-              </FormField>
-              <FormField htmlFor="sale-tax" label="Tax">
-                <Input
-                  id="sale-tax"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={taxAmount}
-                  onChange={(event) => setTaxAmount(Number(event.target.value))}
-                />
-              </FormField>
-            </div>
-          </Surface>
-          <Surface className="sale-totals">
-            <div>
-              <span>Items subtotal</span>
-              <strong>{formatNaira.format(subtotal)}</strong>
-            </div>
-            <div>
-              <span>Sale discount</span>
-              <strong>−{formatNaira.format(discountAmount)}</strong>
-            </div>
-            <div>
-              <span>Tax</span>
-              <strong>{formatNaira.format(taxAmount)}</strong>
-            </div>
-            <div className="sale-totals__total">
-              <span>Booked revenue</span>
-              <strong>{formatNaira.format(totalAmount)}</strong>
-            </div>
-            <div>
-              <span>Amount received</span>
-              <strong>{formatNaira.format(amountPaid)}</strong>
-            </div>
-            <div className={balanceDue > 0 ? 'sale-totals__balance' : ''}>
-              <span>Balance due</span>
-              <strong>{formatNaira.format(balanceDue)}</strong>
-            </div>
-          </Surface>
-          <Button
-            type="submit"
-            className="checkout-submit"
-            loading={isLoading}
-            icon={<ReceiptText aria-hidden="true" size={18} />}
-          >
-            Confirm and record sale
-          </Button>
-          <p className="checkout-note">
-            The sale is saved only after the backend confirms stock and the transaction.
-          </p>
-        </aside>
+              <div>
+                <span>Sale discount</span>
+                <strong>−{formatNaira.format(discountAmount)}</strong>
+              </div>
+              <div>
+                <span>Tax</span>
+                <strong>{formatNaira.format(taxAmount)}</strong>
+              </div>
+              <div className="sale-totals__total">
+                <span>Booked revenue</span>
+                <strong>{formatNaira.format(totalAmount)}</strong>
+              </div>
+              <div>
+                <span>Amount received</span>
+                <strong>{formatNaira.format(amountPaid)}</strong>
+              </div>
+              <div className={balanceDue > 0 ? 'sale-totals__balance' : ''}>
+                <span>Balance due</span>
+                <strong>{formatNaira.format(balanceDue)}</strong>
+              </div>
+            </Surface>
+            <Button
+              type="submit"
+              className="checkout-submit"
+              loading={isLoading}
+              icon={<ReceiptText aria-hidden="true" size={18} />}
+            >
+              Confirm and record sale
+            </Button>
+            <p className="checkout-note">
+              The sale is saved only after the backend confirms stock and the transaction.
+            </p>
+          </aside>
+        )}
       </form>
     </div>
   );
 }
-
-

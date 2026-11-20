@@ -66,6 +66,7 @@ type AppShellProps = {
   recordSaleHref?: string;
   aiActions?: AppShellAiAction[];
   aiBriefing?: AppShellAiBriefing;
+  hideMobileNavigation?: boolean;
 };
 
 export function AppShell({
@@ -80,6 +81,7 @@ export function AppShell({
   recordSaleHref,
   aiActions = [],
   aiBriefing,
+  hideMobileNavigation = false,
 }: AppShellProps) {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'ai' | 'more' | null>(null);
@@ -98,7 +100,7 @@ export function AppShell({
   }
 
   return (
-    <div className="sd-shell">
+    <div className={`sd-shell${hideMobileNavigation ? ' sd-shell--focused' : ''}`}>
       <aside className="sd-sidebar" aria-label="Primary navigation">
         <a
           className="sd-brand"
@@ -203,65 +205,64 @@ export function AppShell({
           <Plus aria-hidden="true" size={25} />
         </a>
       )}
-      <nav
-        className="sd-bottom-nav"
-        aria-label="Mobile navigation"
-      >
-        {navigation.slice(0, 2).map(({ id, label, icon, href }) => {
-          const Icon = icons[icon];
-          return (
-            <a
-              className={`sd-bottom-nav__item ${activeNav === id ? 'is-active' : ''}`}
-              href={href}
-              key={label}
-              aria-current={activeNav === id ? 'page' : undefined}
-              onClick={(event) => handleNavigate(event, href)}
-            >
-              <Icon aria-hidden="true" size={17} />
-              <span>{label}</span>
-            </a>
-          );
-        })}
-        <button
-          className="sd-bottom-nav__ai"
-          type="button"
-          aria-label="Open AI assistant"
-          aria-haspopup="dialog"
-          aria-expanded={mobilePanel === 'ai'}
-          onClick={() => setMobilePanel((panel) => (panel === 'ai' ? null : 'ai'))}
-        >
-          <span aria-hidden="true">
-            <Sparkles size={22} />
-          </span>
-          <small>AI</small>
-        </button>
-        {navigation.slice(2, 3).map(({ id, label, icon, href }) => {
-          const Icon = icons[icon];
-          return (
-            <a
-              className={`sd-bottom-nav__item ${activeNav === id ? 'is-active' : ''}`}
-              href={href}
-              key={label}
-              aria-current={activeNav === id ? 'page' : undefined}
-              onClick={(event) => handleNavigate(event, href)}
-            >
-              <Icon aria-hidden="true" size={17} />
-              <span>{label}</span>
-            </a>
-          );
-        })}
-        <button
-          className="sd-bottom-nav__item sd-bottom-nav__more"
-          type="button"
-          aria-label="Open more navigation"
-          aria-haspopup="dialog"
-          aria-expanded={mobilePanel === 'more'}
-          onClick={() => setMobilePanel((panel) => (panel === 'more' ? null : 'more'))}
-        >
-          <MoreHorizontal aria-hidden="true" size={17} />
-          <span>More</span>
-        </button>
-      </nav>
+      {!hideMobileNavigation && (
+        <nav className="sd-bottom-nav" aria-label="Mobile navigation">
+          {navigation.slice(0, 2).map(({ id, label, icon, href }) => {
+            const Icon = icons[icon];
+            return (
+              <a
+                className={`sd-bottom-nav__item ${activeNav === id ? 'is-active' : ''}`}
+                href={href}
+                key={label}
+                aria-current={activeNav === id ? 'page' : undefined}
+                onClick={(event) => handleNavigate(event, href)}
+              >
+                <Icon aria-hidden="true" size={17} />
+                <span>{label}</span>
+              </a>
+            );
+          })}
+          <button
+            className="sd-bottom-nav__ai"
+            type="button"
+            aria-label="Open AI assistant"
+            aria-haspopup="dialog"
+            aria-expanded={mobilePanel === 'ai'}
+            onClick={() => setMobilePanel((panel) => (panel === 'ai' ? null : 'ai'))}
+          >
+            <span aria-hidden="true">
+              <Sparkles size={22} />
+            </span>
+            <small>AI</small>
+          </button>
+          {navigation.slice(2, 3).map(({ id, label, icon, href }) => {
+            const Icon = icons[icon];
+            return (
+              <a
+                className={`sd-bottom-nav__item ${activeNav === id ? 'is-active' : ''}`}
+                href={href}
+                key={label}
+                aria-current={activeNav === id ? 'page' : undefined}
+                onClick={(event) => handleNavigate(event, href)}
+              >
+                <Icon aria-hidden="true" size={17} />
+                <span>{label}</span>
+              </a>
+            );
+          })}
+          <button
+            className="sd-bottom-nav__item sd-bottom-nav__more"
+            type="button"
+            aria-label="Open more navigation"
+            aria-haspopup="dialog"
+            aria-expanded={mobilePanel === 'more'}
+            onClick={() => setMobilePanel((panel) => (panel === 'more' ? null : 'more'))}
+          >
+            <MoreHorizontal aria-hidden="true" size={17} />
+            <span>More</span>
+          </button>
+        </nav>
+      )}
       {mobilePanel && (
         <div className="sd-mobile-panel" role="dialog" aria-modal="true">
           <button
@@ -278,11 +279,7 @@ export function AppShell({
                   {mobilePanel === 'ai' ? 'What would you like to capture?' : 'More options'}
                 </h2>
               </div>
-              <button
-                type="button"
-                aria-label="Close menu"
-                onClick={() => setMobilePanel(null)}
-              >
+              <button type="button" aria-label="Close menu" onClick={() => setMobilePanel(null)}>
                 <X aria-hidden="true" size={20} />
               </button>
             </div>
@@ -291,14 +288,18 @@ export function AppShell({
                 {aiBriefing && (
                   <section className="sd-ai-briefing" aria-labelledby="ai-briefing-title">
                     <div className="sd-ai-briefing__title">
-                      <span><Sparkles aria-hidden="true" size={17} /></span>
+                      <span>
+                        <Sparkles aria-hidden="true" size={17} />
+                      </span>
                       <div>
                         <h3 id="ai-briefing-title">{aiBriefing.title}</h3>
                         {aiBriefing.status && <small>{aiBriefing.status}</small>}
                       </div>
                     </div>
                     <p>{aiBriefing.summary}</p>
-                    {aiBriefing.meta && <small className="sd-ai-briefing__meta">{aiBriefing.meta}</small>}
+                    {aiBriefing.meta && (
+                      <small className="sd-ai-briefing__meta">{aiBriefing.meta}</small>
+                    )}
                   </section>
                 )}
                 <p className="sd-mobile-panel__intro">
@@ -325,7 +326,9 @@ export function AppShell({
                     );
                   })}
                   {aiActions.length === 0 && (
-                    <p className="sd-mobile-panel__empty">AI voice actions are unavailable for this role.</p>
+                    <p className="sd-mobile-panel__empty">
+                      AI voice actions are unavailable for this role.
+                    </p>
                   )}
                 </div>
               </>

@@ -11,9 +11,10 @@ import {
 } from '@trada/ui';
 import {
   AlertTriangle,
-  ArrowLeft,
   Boxes,
+  Camera,
   FilePenLine,
+  Keyboard,
   Mic,
   PackageCheck,
   Square,
@@ -38,7 +39,12 @@ import {
   type ProductUpdateInput,
 } from '../../lib/api';
 import { readApiError } from '../../lib/apiError';
-import { formatFileSize, formatRecordingDuration, fileToDataUrl, recordingToDataUrl } from '../../lib/formatters';
+import {
+  formatFileSize,
+  formatRecordingDuration,
+  fileToDataUrl,
+  recordingToDataUrl,
+} from '../../lib/formatters';
 import { BackLink } from '../../components/BackLink';
 import { NumberField, TextField } from '../../components/FormFields';
 
@@ -113,6 +119,11 @@ export function ProductFormPage() {
   const [searchParams] = useSearchParams();
   const user = useAppSelector((state) => state.auth.user);
   const role = normalizeRole(user?.role ?? 'user');
+  const voiceRequested = searchParams.get('ai') === 'voice';
+  const [captureMode, setCaptureMode] = useState<'choose' | 'voice' | 'image' | 'manual'>(
+    voiceRequested ? 'voice' : 'choose',
+  );
+  const [voiceCountdown, setVoiceCountdown] = useState<number | null>(voiceRequested ? 3 : null);
   const {
     data: existing,
     isLoading: isLoadingProduct,
@@ -149,6 +160,7 @@ export function ProductFormPage() {
   const recordingStartedAtRef = useRef<number | null>(null);
   const audioPreviewUrlRef = useRef<string | null>(null);
   const voiceEntryRef = useRef<HTMLElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (existing) {
@@ -194,6 +206,22 @@ export function ProductFormPage() {
     }, 250);
     return () => window.clearInterval(timer);
   }, [isRecordingVoice]);
+
+  useEffect(() => {
+    if (captureMode !== 'voice' || voiceCountdown === null) return;
+    if (voiceCountdown === 0) {
+      setVoiceCountdown(null);
+      void startVoiceRecording();
+      return;
+    }
+    const timer = window.setTimeout(
+      () => setVoiceCountdown((current) => (current === null ? null : current - 1)),
+      1000,
+    );
+    return () => window.clearTimeout(timer);
+    // Recording begins only after the explicit, user-selected countdown completes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [captureMode, voiceCountdown]);
 
   useEffect(() => {
     if (isEditing || searchParams.get('ai') !== 'voice') return;
@@ -274,6 +302,7 @@ export function ProductFormPage() {
           mimeType: recording.type || 'audio/webm',
           url,
         });
+        prepareCapturedAudio(recording, durationSeconds, recording.type || 'audio/webm');
       });
       recorder.start();
       setIsRecordingVoice(true);
@@ -288,19 +317,23 @@ export function ProductFormPage() {
     if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
   }
 
-  function prepareAudioVoiceDraft() {
-    if (!audioPreview) return;
-    if (audioPreview.durationSeconds > maxAudioDurationSeconds) {
+  function chooseVoiceCapture() {
+    setVoiceError(undefined);
+    setVoiceDraft(undefined);
+    setCaptureMode('voice');
+    setVoiceCountdown(3);
+  }
+
+  function prepareCapturedAudio(recording: Blob, durationSeconds: number, mimeType: string) {
+    if (durationSeconds > maxAudioDurationSeconds) {
       setVoiceError('Keep voice recordings to 60 seconds or less, then try again.');
       return;
     }
-    if (audioPreview.blob.size > maxAudioBytes) {
+    if (recording.size > maxAudioBytes) {
       setVoiceError('Keep voice recordings to 10 MB or less, then try again.');
       return;
     }
-    void recordingToDataUrl(audioPreview.blob).then((audio) =>
-      generateVoiceDraft({ audio, mimeType: audioPreview.mimeType }),
-    );
+    void recordingToDataUrl(recording).then((audio) => generateVoiceDraft({ audio, mimeType }));
   }
 
   function prepareTypedVoiceDraft() {
@@ -336,6 +369,7 @@ export function ProductFormPage() {
     }));
     setVoiceDraft(undefined);
     setVoiceError(undefined);
+    setCaptureMode('manual');
   }
 
   async function prepareVoiceUpdateSuggestion() {
@@ -400,7 +434,10 @@ export function ProductFormPage() {
         return;
       }
       setVoiceUpdateError(
-        readApiError(reason, 'We couldnâ€™t apply this reviewed update. Try again or edit manually.'),
+        readApiError(
+          reason,
+          'We couldnâ€™t apply this reviewed update. Try again or edit manually.',
+        ),
       );
     }
   }
@@ -409,6 +446,7 @@ export function ProductFormPage() {
     if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     setImageResult(undefined);
     setImageError(undefined);
+    setCaptureMode('image');
     if (file && file.size > maxImageBytes) {
       setImageFile(undefined);
       setImagePreviewUrl(undefined);
@@ -530,146 +568,296 @@ export function ProductFormPage() {
         description={
           isEditing
             ? 'Update the selling details and stock information recorded for this product.'
-            : 'Start with the information needed to identify, price and track this product.'
+            : captureMode === 'choose'
+              ? 'Choose the quickest way to add this product.'
+              : captureMode === 'voice'
+                ? 'Describe the product and let Trada prepare an editable draft.'
+                : captureMode === 'image'
+                  ? 'Use a product or package image to prepare an editable draft.'
+                  : 'Review the information needed to identify, price and track this product.'
         }
       />
 
       <form onSubmit={handleSubmit}>
+        {!isEditing && (
+          <input
+            ref={imageInputRef}
+            id="product-image-upload"
+            className="capture-mode-picker__file-input"
+            aria-label="Product image"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            capture="environment"
+            onChange={(event) => selectImage(event.target.files?.[0])}
+          />
+        )}
         {error && (
           <Alert tone="error" icon={<AlertTriangle aria-hidden="true" size={18} />}>
             {error}
           </Alert>
         )}
+        {!isEditing && captureMode === 'choose' && (
+          <Surface className="product-form-section capture-mode-picker">
+            <div className="capture-mode-picker__heading">
+              <span>Choose a capture method</span>
+              <h2>How would you like to add this product?</h2>
+              <p>Start with voice, a photo, or the existing product form.</p>
+            </div>
+            <div className="capture-mode-picker__options">
+              <button
+                className="capture-mode-card capture-mode-card--primary"
+                type="button"
+                aria-label="Record with voice"
+                onClick={chooseVoiceCapture}
+              >
+                <span>
+                  <Mic aria-hidden="true" size={24} />
+                </span>
+                <strong>Record with voice</strong>
+                <small>Starts recording after a 3-second countdown</small>
+              </button>
+              <button
+                className="capture-mode-card"
+                type="button"
+                aria-label="Capture or upload an image"
+                onClick={() => imageInputRef.current?.click()}
+              >
+                <span>
+                  <Camera aria-hidden="true" size={24} />
+                </span>
+                <strong>Capture or upload an image</strong>
+                <small>Opens your camera on supported phones, or a file picker on desktop</small>
+              </button>
+              <button
+                className="capture-mode-card"
+                type="button"
+                aria-label="Type manually"
+                onClick={() => setCaptureMode('manual')}
+              >
+                <span>
+                  <Keyboard aria-hidden="true" size={24} />
+                </span>
+                <strong>Type manually</strong>
+                <small>Open the existing product form</small>
+              </button>
+            </div>
+          </Surface>
+        )}
 
-        {!isEditing && (
+        {!isEditing && captureMode === 'voice' && (
           <section
             className="voice-entry-target"
             ref={voiceEntryRef}
             tabIndex={-1}
             aria-label="AI voice product capture"
           >
-            <Surface className="product-form-section voice-draft-entry">
-            <div className="form-section-heading">
-              <div>
-                <h2>Add product by voice</h2>
-                <p>Record a description, review the draft, then save this form normally.</p>
-              </div>
-            </div>
-            <div className="voice-draft-entry__actions">
-              <Button
-                type="button"
-                variant="secondary"
-                loading={voiceDraftState.isLoading && !isRecordingVoice}
-                onClick={() =>
-                  isRecordingVoice ? stopVoiceRecording() : void startVoiceRecording()
-                }
-                icon={
-                  isRecordingVoice ? (
-                    <Square aria-hidden="true" size={16} fill="currentColor" />
+            <Surface className="product-form-section voice-draft-entry focused-capture">
+              <ol className="focused-capture__progress" aria-label="Product capture progress">
+                <li className={!voiceDraft ? 'is-active' : ''}>
+                  <span>1</span> Capture
+                </li>
+                <li className={voiceDraft ? 'is-active' : ''}>
+                  <span>2</span> Review
+                </li>
+                <li>
+                  <span>3</span> Confirm
+                </li>
+              </ol>
+              <div className="focused-capture__hero">
+                <span className={`focused-capture__orb${isRecordingVoice ? ' is-listening' : ''}`}>
+                  {isRecordingVoice ? (
+                    <Square aria-hidden="true" size={28} fill="currentColor" />
                   ) : (
-                    <Mic aria-hidden="true" size={17} />
-                  )
-                }
-              >
-                {isRecordingVoice ? 'Stop recording' : 'Start voice recording'}
-              </Button>
-              <small>
-                {isRecordingVoice
-                  ? `Recording ${formatRecordingDuration(recordingElapsedSeconds)} â€” tap stop when finished.`
-                  : 'The AI only prepares a draft. It cannot create a product from this action.'}
-              </small>
-            </div>
-            {audioPreview && (
-              <div className="voice-recording-preview">
+                    <Mic aria-hidden="true" size={32} />
+                  )}
+                </span>
                 <div>
-                  <strong>Recording ready</strong>
-                  <span>
-                    {formatRecordingDuration(audioPreview.durationSeconds)} Â·{' '}
-                    {formatFileSize(audioPreview.blob.size)}
-                  </span>
+                  <h2>
+                    {voiceCountdown !== null
+                      ? `Recording starts in ${voiceCountdown}`
+                      : isRecordingVoice
+                        ? 'Listening to your product'
+                        : voiceDraftState.isLoading
+                          ? 'Transcribing your product'
+                          : 'Describe the product'}
+                  </h2>
+                  <p>
+                    {voiceCountdown !== null
+                      ? 'Get ready to speak naturally when the countdown finishes.'
+                      : isRecordingVoice
+                        ? 'Include its name, price, stock quantity and location.'
+                        : 'Speak naturally. Trada prepares an editable draft; nothing is saved yet.'}
+                  </p>
                 </div>
-                <audio controls preload="metadata" src={audioPreview.url}>
-                  Your browser cannot play this recording.
-                </audio>
-                <div className="voice-recording-preview__actions">
+                {voiceCountdown === null && !isRecordingVoice && (
+                  <p className="focused-capture__example">
+                    “Industrial spanner, four thousand naira, twelve in stock.”
+                  </p>
+                )}
+                {(voiceCountdown !== null || isRecordingVoice) && (
+                  <div className="focused-capture__wave" aria-hidden="true">
+                    {Array.from({ length: 11 }, (_, index) => (
+                      <span key={index} />
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="voice-draft-entry__actions">
+                <Button
+                  type="button"
+                  loading={
+                    voiceDraftState.isLoading && !isRecordingVoice && voiceCountdown === null
+                  }
+                  disabled={voiceCountdown !== null}
+                  onClick={() => (isRecordingVoice ? stopVoiceRecording() : chooseVoiceCapture())}
+                  icon={
+                    isRecordingVoice ? (
+                      <Square aria-hidden="true" size={16} fill="currentColor" />
+                    ) : (
+                      <Mic aria-hidden="true" size={17} />
+                    )
+                  }
+                >
+                  {voiceCountdown !== null
+                    ? `Starting in ${voiceCountdown}`
+                    : isRecordingVoice
+                      ? 'Stop and transcribe'
+                      : 'Record again'}
+                </Button>
+                <small>
+                  {isRecordingVoice
+                    ? `Recording ${formatRecordingDuration(recordingElapsedSeconds)} â€” tap stop when finished.`
+                    : 'The AI only prepares a draft. It cannot create a product from this action.'}
+                </small>
+              </div>
+              {audioPreview && (
+                <div className="voice-recording-preview" aria-live="polite">
+                  <div className="voice-recording-preview__header">
+                    <div>
+                      <strong>Recording captured</strong>
+                      <span>Ready for draft review</span>
+                    </div>
+                    <span className="voice-recording-preview__meta">
+                      {formatRecordingDuration(audioPreview.durationSeconds)} Â·{' '}
+                      {formatFileSize(audioPreview.blob.size)}
+                    </span>
+                  </div>
+                  <audio controls preload="metadata" src={audioPreview.url}>
+                    Your browser cannot play this recording.
+                  </audio>
+                  <div className="voice-recording-preview__actions">
+                    <span className="voice-recording-preview__status" role="status">
+                      {voiceDraftState.isLoading
+                        ? 'Transcribing recordingâ€¦'
+                        : 'Recording sent for transcription.'}
+                    </span>
+                    <Button type="button" variant="ghost" onClick={discardAudioPreview}>
+                      Discard recording
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <details className="voice-draft-entry__fallback">
+                <summary>Canâ€™t record? Type a product description instead</summary>
+                <FormField htmlFor="voice-product-text" label="Product description">
+                  <Textarea
+                    id="voice-product-text"
+                    rows={3}
+                    value={voiceText}
+                    onChange={(event) => setVoiceText(event.target.value)}
+                    placeholder="For example: 30 bags of Semovita, cost 11k, sell 13.5k, in the warehouse."
+                  />
+                </FormField>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  loading={voiceDraftState.isLoading}
+                  onClick={prepareTypedVoiceDraft}
+                  icon={<FilePenLine aria-hidden="true" size={17} />}
+                >
+                  Prepare typed draft
+                </Button>
+              </details>
+              {voiceError && <Alert tone="warning">{voiceError}</Alert>}
+              {voiceDraft && (
+                <div className="voice-draft-review" aria-live="polite">
+                  <Alert tone="warning">
+                    No product has been created. Review the extracted details before saving this
+                    form.
+                  </Alert>
+                  <div className="voice-draft-review__transcript">
+                    <span>Transcript</span>
+                    <p>{voiceDraft.transcript}</p>
+                  </div>
+                  <div className="voice-draft-review__actions">
+                    <Button type="button" onClick={applyVoiceDraft}>
+                      Review details in product form
+                    </Button>
+                    <Button type="button" variant="ghost" onClick={() => setVoiceDraft(undefined)}>
+                      Discard draft
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <div className="focused-capture__alternatives">
+                {voiceCountdown !== null && (
                   <Button
                     type="button"
                     variant="secondary"
-                    loading={voiceDraftState.isLoading}
-                    onClick={prepareAudioVoiceDraft}
+                    onClick={() => {
+                      setVoiceCountdown(null);
+                      setCaptureMode('choose');
+                    }}
                   >
-                    Prepare audio draft
+                    Cancel countdown
                   </Button>
-                  <Button type="button" variant="ghost" onClick={discardAudioPreview}>
-                    Discard recording
-                  </Button>
-                </div>
+                )}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => imageInputRef.current?.click()}
+                  icon={<Camera aria-hidden="true" size={17} />}
+                >
+                  Use product photo
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setCaptureMode('manual')}>
+                  Type product manually
+                </Button>
               </div>
-            )}
-            <details className="voice-draft-entry__fallback">
-              <summary>Canâ€™t record? Type a product description instead</summary>
-              <FormField htmlFor="voice-product-text" label="Product description">
-                <Textarea
-                  id="voice-product-text"
-                  rows={3}
-                  value={voiceText}
-                  onChange={(event) => setVoiceText(event.target.value)}
-                  placeholder="For example: 30 bags of Semovita, cost 11k, sell 13.5k, in the warehouse."
-                />
-              </FormField>
-              <Button
-                type="button"
-                variant="ghost"
-                loading={voiceDraftState.isLoading}
-                onClick={prepareTypedVoiceDraft}
-                icon={<FilePenLine aria-hidden="true" size={17} />}
-              >
-                Prepare typed draft
-              </Button>
-            </details>
-            {voiceError && <Alert tone="warning">{voiceError}</Alert>}
-            {voiceDraft && (
-              <div className="voice-draft-review" aria-live="polite">
-                <Alert tone="warning">
-                  No product has been created. Review the extracted details before saving this form.
-                </Alert>
-                <div className="voice-draft-review__transcript">
-                  <span>Transcript</span>
-                  <p>{voiceDraft.transcript}</p>
-                </div>
-                <div className="voice-draft-review__actions">
-                  <Button type="button" onClick={applyVoiceDraft}>
-                    Use details in product form
-                  </Button>
-                  <Button type="button" variant="ghost" onClick={() => setVoiceDraft(undefined)}>
-                    Discard draft
-                  </Button>
-                </div>
-              </div>
-            )}
             </Surface>
           </section>
         )}
 
-        {!isEditing && (
-          <Surface className="product-form-section image-product-test">
+        {!isEditing && captureMode === 'image' && (
+          <Surface className="product-form-section image-product-test focused-capture">
+            <ol className="focused-capture__progress" aria-label="Product image capture progress">
+              <li className={!imageResult ? 'is-active' : ''}>
+                <span>1</span> Capture
+              </li>
+              <li className={imageResult ? 'is-active' : ''}>
+                <span>2</span> Review
+              </li>
+              <li>
+                <span>3</span> Confirm
+              </li>
+            </ol>
             <div className="form-section-heading">
               <div>
                 <h2>Add product from image</h2>
-                <p>
-                  Use a package, product or shelf label to prepare an editable product draft.
-                </p>
+                <p>Use a package, product or shelf label to prepare an editable product draft.</p>
               </div>
             </div>
-            <Alert tone="info">No product is created until you review the form and select Save product.</Alert>
-            <FormField htmlFor="product-image-upload" label="Product image">
-              <Input
-                id="product-image-upload"
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                onChange={(event) => selectImage(event.target.files?.[0])}
-              />
-            </FormField>
+            <Alert tone="info">
+              No product is created until you review the form and select Save product.
+            </Alert>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => imageInputRef.current?.click()}
+              icon={<Camera aria-hidden="true" size={17} />}
+            >
+              Capture or choose another image
+            </Button>
             <FormField
               htmlFor="image-product-location"
               label="Storage location"
@@ -717,7 +905,7 @@ export function ProductFormPage() {
                 ) : null}
                 <div className="voice-draft-review__actions">
                   <Button type="button" onClick={applyImageDraft}>
-                    Use details in product form
+                    Review details in product form
                   </Button>
                   <Button type="button" variant="ghost" onClick={() => setImageResult(undefined)}>
                     Discard draft
@@ -725,6 +913,14 @@ export function ProductFormPage() {
                 </div>
               </div>
             )}
+            <div className="focused-capture__alternatives">
+              <Button type="button" variant="secondary" onClick={chooseVoiceCapture}>
+                Use voice instead
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setCaptureMode('manual')}>
+                Type product manually
+              </Button>
+            </div>
           </Surface>
         )}
 
@@ -777,8 +973,9 @@ export function ProductFormPage() {
                       ? `Stock: ${voiceUpdateDraft.stockMovement.currentQuantity} ${voiceUpdateDraft.stockMovement.quantityMode === 'subtract' ? '−' : '+'} ${voiceUpdateDraft.stockMovement.quantityDelta} → ${voiceUpdateDraft.stockMovement.resultingQuantity}. `
                       : voiceUpdateDraft.extractedFields?.quantityMode
                         ? `Quantity: ${voiceUpdateDraft.extractedFields.quantityMode} ${voiceUpdateDraft.extractedFields.quantity ?? 'not provided'}. `
-                      : ''}
-                    {(voiceUpdateDraft.draft?.sellingPrice ?? voiceUpdateDraft.extractedFields?.sellingPrice) != null
+                        : ''}
+                    {(voiceUpdateDraft.draft?.sellingPrice ??
+                      voiceUpdateDraft.extractedFields?.sellingPrice) != null
                       ? `Selling price: ₦${voiceUpdateDraft.draft?.sellingPrice ?? voiceUpdateDraft.extractedFields?.sellingPrice}.`
                       : 'No sale-ready product change was extracted.'}
                   </p>
@@ -809,7 +1006,9 @@ export function ProductFormPage() {
             {voiceUpdateConflict && (
               <div className="voice-draft-review" role="alert">
                 <Alert tone="warning">
-                  This product changed on another device. Current stock: {voiceUpdateConflict.currentProduct.quantity}; current selling price: ₦{voiceUpdateConflict.currentProduct.sellingPrice}.
+                  This product changed on another device. Current stock:{' '}
+                  {voiceUpdateConflict.currentProduct.quantity}; current selling price: ₦
+                  {voiceUpdateConflict.currentProduct.sellingPrice}.
                 </Alert>
                 <div className="voice-draft-review__actions">
                   <Button
@@ -825,7 +1024,9 @@ export function ProductFormPage() {
                   <Button
                     type="button"
                     loading={updateState.isLoading}
-                    onClick={() => void applyVoiceUpdate(voiceUpdateConflict.serverCurrentUpdatedAt)}
+                    onClick={() =>
+                      void applyVoiceUpdate(voiceUpdateConflict.serverCurrentUpdatedAt)
+                    }
                   >
                     Confirm overwrite
                   </Button>
@@ -835,250 +1036,259 @@ export function ProductFormPage() {
           </Surface>
         )}
 
-        <div className="product-form-layout">
-          <div className="product-form-main">
-            <Surface className="product-form-section">
-              <div className="form-section-heading">
-                <span className="form-section-heading__step">01</span>
-                <div>
-                  <h2>Product details</h2>
-                  <p>Use names and identifiers your team can recognize quickly.</p>
-                </div>
-              </div>
-              <div className="form-grid">
-                <TextField
-                  id="product-name"
-                  label="Product name"
-                  value={product.name}
-                  onChange={(value) => setProduct({ ...product, name: value })}
-                  required
-                  autoComplete="off"
-                />
-                <TextField
-                  id="product-category"
-                  label="Category"
-                  value={product.category ?? ''}
-                  onChange={(value) => setProduct({ ...product, category: value })}
-                  hint="Use your existing business category wording."
-                />
-                <FormField
-                  className="product-form-field--wide"
-                  htmlFor="product-description"
-                  label="Description"
-                >
-                  <Textarea
-                    id="product-description"
-                    value={product.description ?? ''}
-                    onChange={(event) =>
-                      setProduct({ ...product, description: event.target.value })
-                    }
-                    rows={3}
-                  />
-                </FormField>
-                <FormField htmlFor="product-type" label="Product type" required>
-                  <Select
-                    id="product-type"
-                    value={product.type}
-                    onChange={(event) =>
-                      setProduct({ ...product, type: event.target.value as ProductInput['type'] })
-                    }
-                    required
-                  >
-                    <option value="inventory_based">Inventory based</option>
-                    <option value="input_based">Input based / service</option>
-                  </Select>
-                </FormField>
-                <FormField htmlFor="product-condition" label="Condition" required>
-                  <Select
-                    id="product-condition"
-                    value={product.condition}
-                    onChange={(event) =>
-                      setProduct({
-                        ...product,
-                        condition: event.target.value as ProductInput['condition'],
-                      })
-                    }
-                    required
-                  >
-                    <option value="new">New</option>
-                    <option value="used">Used</option>
-                    <option value="foreign_used">Foreign used</option>
-                  </Select>
-                </FormField>
-                <TextField
-                  id="product-sku"
-                  label="SKU"
-                  value={product.sku ?? ''}
-                  onChange={(value) => setProduct({ ...product, sku: value })}
-                  hint="Must be unique when provided."
-                />
-                <TextField
-                  id="product-barcode"
-                  label="Barcode"
-                  value={product.barcode ?? ''}
-                  onChange={(value) => setProduct({ ...product, barcode: value })}
-                />
-              </div>
-            </Surface>
-
-            <Surface className="product-form-section">
-              <div className="form-section-heading">
-                <span className="form-section-heading__step">02</span>
-                <div>
-                  <h2>Pricing</h2>
-                  <p>Cost is private and supports the backend gross-profit estimate.</p>
-                </div>
-              </div>
-              <div className="form-grid">
-                <NumberField
-                  id="cost-price"
-                  label="Cost price (₦)"
-                  value={product.costPrice}
-                  onChange={(value) => setProduct({ ...product, costPrice: value })}
-                />
-                <NumberField
-                  id="selling-price"
-                  label="Selling price (₦)"
-                  value={product.sellingPrice}
-                  onChange={(value) => setProduct({ ...product, sellingPrice: value ?? 0 })}
-                  required
-                />
-                <NumberField
-                  id="discount-price"
-                  label="Discount price (₦)"
-                  value={product.discountPrice}
-                  onChange={(value) => setProduct({ ...product, discountPrice: value })}
-                  hint="Leave blank when there is no offer price."
-                />
-              </div>
-            </Surface>
-
-            <Surface className="product-form-section">
-              <div className="form-section-heading">
-                <span className="form-section-heading__step">03</span>
-                <div>
-                  <h2>Stock</h2>
-                  <p>Record the current quantity and the point that needs attention.</p>
-                </div>
-              </div>
-              <div className="form-grid">
-                <NumberField
-                  id="product-quantity"
-                  label="Quantity"
-                  value={product.quantity}
-                  onChange={(value) => setProduct({ ...product, quantity: value ?? 0 })}
-                  required
-                />
-                <TextField
-                  id="product-unit"
-                  label="Unit"
-                  value={product.unit}
-                  onChange={(value) => setProduct({ ...product, unit: value })}
-                  required
-                  hint="For example: piece, pack, bottle or kg."
-                />
-                <NumberField
-                  id="stock-threshold"
-                  label="Low-stock threshold"
-                  value={product.stockThreshold}
-                  onChange={(value) => setProduct({ ...product, stockThreshold: value ?? 0 })}
-                  required
-                />
-                <TextField
-                  id="product-location"
-                  label="Location"
-                  value={product.location ?? ''}
-                  onChange={(value) => setProduct({ ...product, location: value })}
-                  hint="Optional shelf, store or warehouse reference."
-                />
-              </div>
-            </Surface>
-          </div>
-
-          <aside className="product-form-aside">
-            <Surface className="product-form-section product-status-card">
-              <div className="form-section-heading">
-                <div>
-                  <h2>Availability</h2>
-                  <p>Control whether this product is active in your records.</p>
-                </div>
-              </div>
-              <label className="product-active-toggle">
-                <input
-                  type="checkbox"
-                  checked={product.isActive}
-                  onChange={(event) => setProduct({ ...product, isActive: event.target.checked })}
-                />
-                <span aria-hidden="true" />
-                <span>
-                  <strong>{product.isActive ? 'Active product' : 'Inactive product'}</strong>
-                  <small>
-                    {product.isActive
-                      ? 'Available for current workflows'
-                      : 'Retained but marked inactive'}
-                  </small>
-                </span>
-              </label>
-            </Surface>
-
-            {isEditing && can(role, 'product:delete') && (
-              <Surface className="product-danger-zone">
-                <h2>Delete product</h2>
-                <p>Deletion may affect references to this product in historical records.</p>
-                {confirmDelete ? (
-                  <div className="product-delete-confirm" role="alert">
-                    <strong>Delete “{product.name}” permanently?</strong>
+        {(isEditing || captureMode === 'manual') && (
+          <>
+            <div className="product-form-layout">
+              <div className="product-form-main">
+                <Surface className="product-form-section">
+                  <div className="form-section-heading">
+                    <span className="form-section-heading__step">01</span>
                     <div>
+                      <h2>Product details</h2>
+                      <p>Use names and identifiers your team can recognize quickly.</p>
+                    </div>
+                  </div>
+                  <div className="form-grid">
+                    <TextField
+                      id="product-name"
+                      label="Product name"
+                      value={product.name}
+                      onChange={(value) => setProduct({ ...product, name: value })}
+                      required
+                      autoComplete="off"
+                    />
+                    <TextField
+                      id="product-category"
+                      label="Category"
+                      value={product.category ?? ''}
+                      onChange={(value) => setProduct({ ...product, category: value })}
+                      hint="Use your existing business category wording."
+                    />
+                    <FormField
+                      className="product-form-field--wide"
+                      htmlFor="product-description"
+                      label="Description"
+                    >
+                      <Textarea
+                        id="product-description"
+                        value={product.description ?? ''}
+                        onChange={(event) =>
+                          setProduct({ ...product, description: event.target.value })
+                        }
+                        rows={3}
+                      />
+                    </FormField>
+                    <FormField htmlFor="product-type" label="Product type" required>
+                      <Select
+                        id="product-type"
+                        value={product.type}
+                        onChange={(event) =>
+                          setProduct({
+                            ...product,
+                            type: event.target.value as ProductInput['type'],
+                          })
+                        }
+                        required
+                      >
+                        <option value="inventory_based">Inventory based</option>
+                        <option value="input_based">Input based / service</option>
+                      </Select>
+                    </FormField>
+                    <FormField htmlFor="product-condition" label="Condition" required>
+                      <Select
+                        id="product-condition"
+                        value={product.condition}
+                        onChange={(event) =>
+                          setProduct({
+                            ...product,
+                            condition: event.target.value as ProductInput['condition'],
+                          })
+                        }
+                        required
+                      >
+                        <option value="new">New</option>
+                        <option value="used">Used</option>
+                        <option value="foreign_used">Foreign used</option>
+                      </Select>
+                    </FormField>
+                    <TextField
+                      id="product-sku"
+                      label="SKU"
+                      value={product.sku ?? ''}
+                      onChange={(value) => setProduct({ ...product, sku: value })}
+                      hint="Must be unique when provided."
+                    />
+                    <TextField
+                      id="product-barcode"
+                      label="Barcode"
+                      value={product.barcode ?? ''}
+                      onChange={(value) => setProduct({ ...product, barcode: value })}
+                    />
+                  </div>
+                </Surface>
+
+                <Surface className="product-form-section">
+                  <div className="form-section-heading">
+                    <span className="form-section-heading__step">02</span>
+                    <div>
+                      <h2>Pricing</h2>
+                      <p>Cost is private and supports the backend gross-profit estimate.</p>
+                    </div>
+                  </div>
+                  <div className="form-grid">
+                    <NumberField
+                      id="cost-price"
+                      label="Cost price (₦)"
+                      value={product.costPrice}
+                      onChange={(value) => setProduct({ ...product, costPrice: value })}
+                    />
+                    <NumberField
+                      id="selling-price"
+                      label="Selling price (₦)"
+                      value={product.sellingPrice}
+                      onChange={(value) => setProduct({ ...product, sellingPrice: value ?? 0 })}
+                      required
+                    />
+                    <NumberField
+                      id="discount-price"
+                      label="Discount price (₦)"
+                      value={product.discountPrice}
+                      onChange={(value) => setProduct({ ...product, discountPrice: value })}
+                      hint="Leave blank when there is no offer price."
+                    />
+                  </div>
+                </Surface>
+
+                <Surface className="product-form-section">
+                  <div className="form-section-heading">
+                    <span className="form-section-heading__step">03</span>
+                    <div>
+                      <h2>Stock</h2>
+                      <p>Record the current quantity and the point that needs attention.</p>
+                    </div>
+                  </div>
+                  <div className="form-grid">
+                    <NumberField
+                      id="product-quantity"
+                      label="Quantity"
+                      value={product.quantity}
+                      onChange={(value) => setProduct({ ...product, quantity: value ?? 0 })}
+                      required
+                    />
+                    <TextField
+                      id="product-unit"
+                      label="Unit"
+                      value={product.unit}
+                      onChange={(value) => setProduct({ ...product, unit: value })}
+                      required
+                      hint="For example: piece, pack, bottle or kg."
+                    />
+                    <NumberField
+                      id="stock-threshold"
+                      label="Low-stock threshold"
+                      value={product.stockThreshold}
+                      onChange={(value) => setProduct({ ...product, stockThreshold: value ?? 0 })}
+                      required
+                    />
+                    <TextField
+                      id="product-location"
+                      label="Location"
+                      value={product.location ?? ''}
+                      onChange={(value) => setProduct({ ...product, location: value })}
+                      hint="Optional shelf, store or warehouse reference."
+                    />
+                  </div>
+                </Surface>
+              </div>
+
+              <aside className="product-form-aside">
+                <Surface className="product-form-section product-status-card">
+                  <div className="form-section-heading">
+                    <div>
+                      <h2>Availability</h2>
+                      <p>Control whether this product is active in your records.</p>
+                    </div>
+                  </div>
+                  <label className="product-active-toggle">
+                    <input
+                      type="checkbox"
+                      checked={product.isActive}
+                      onChange={(event) =>
+                        setProduct({ ...product, isActive: event.target.checked })
+                      }
+                    />
+                    <span aria-hidden="true" />
+                    <span>
+                      <strong>{product.isActive ? 'Active product' : 'Inactive product'}</strong>
+                      <small>
+                        {product.isActive
+                          ? 'Available for current workflows'
+                          : 'Retained but marked inactive'}
+                      </small>
+                    </span>
+                  </label>
+                </Surface>
+
+                {isEditing && can(role, 'product:delete') && (
+                  <Surface className="product-danger-zone">
+                    <h2>Delete product</h2>
+                    <p>Deletion may affect references to this product in historical records.</p>
+                    {confirmDelete ? (
+                      <div className="product-delete-confirm" role="alert">
+                        <strong>Delete “{product.name}” permanently?</strong>
+                        <div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setConfirmDelete(false)}
+                            disabled={deleteState.isLoading}
+                          >
+                            Keep product
+                          </Button>
+                          <Button
+                            type="button"
+                            className="product-delete-button"
+                            onClick={() => void handleDelete()}
+                            loading={deleteState.isLoading}
+                            icon={<Trash2 aria-hidden="true" size={17} />}
+                          >
+                            Yes, delete product
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
                       <Button
                         type="button"
                         variant="ghost"
-                        onClick={() => setConfirmDelete(false)}
-                        disabled={deleteState.isLoading}
-                      >
-                        Keep product
-                      </Button>
-                      <Button
-                        type="button"
-                        className="product-delete-button"
-                        onClick={() => void handleDelete()}
-                        loading={deleteState.isLoading}
+                        className="product-delete-trigger"
+                        onClick={() => setConfirmDelete(true)}
                         icon={<Trash2 aria-hidden="true" size={17} />}
                       >
-                        Yes, delete product
+                        Delete product
                       </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="product-delete-trigger"
-                    onClick={() => setConfirmDelete(true)}
-                    icon={<Trash2 aria-hidden="true" size={17} />}
-                  >
-                    Delete product
-                  </Button>
+                    )}
+                  </Surface>
                 )}
-              </Surface>
-            )}
-          </aside>
-        </div>
+              </aside>
+            </div>
 
-        <div className="product-form-actions">
-          <span>Review required fields before saving.</span>
-          <div>
-            <Button asChild variant="ghost">
-              <Link to="/products">Cancel</Link>
-            </Button>
-            <Button
-              type="submit"
-              loading={createState.isLoading || updateState.isLoading}
-              icon={<PackageCheck aria-hidden="true" size={18} />}
-            >
-              {isEditing ? 'Save changes' : 'Save product'}
-            </Button>
-          </div>
-        </div>
+            <div className="product-form-actions">
+              <span>Review required fields before saving.</span>
+              <div>
+                <Button asChild variant="ghost">
+                  <Link to="/products">Cancel</Link>
+                </Button>
+                <Button
+                  type="submit"
+                  loading={createState.isLoading || updateState.isLoading}
+                  icon={<PackageCheck aria-hidden="true" size={18} />}
+                >
+                  {isEditing ? 'Save changes' : 'Save product'}
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </form>
     </div>
   );
@@ -1097,4 +1307,3 @@ function ProductFormSkeleton() {
     </div>
   );
 }
-

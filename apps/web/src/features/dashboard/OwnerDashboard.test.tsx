@@ -90,6 +90,18 @@ test('shows available analytics and an explicit placeholder for inventory value'
   expect(screen.queryByText('Qualified')).not.toBeInTheDocument();
 });
 
+test('omits date query parameters for the current-date dashboard request', () => {
+  renderDashboard();
+
+  expect(mockState.analyticsParams).toEqual({});
+  expect(mockState.salesParams).toEqual({
+    page: 1,
+    limit: 5,
+    sortBy: 'createdAt',
+    sortOrder: 'DESC',
+  });
+});
+
 test('keeps the greeting and summary above the grouped middle actions', () => {
   renderDashboard();
   const greeting = screen.getByRole('heading', { level: 1 });
@@ -121,15 +133,19 @@ test('changes analytics and recent sales queries with the selected period', () =
 
 test('shows available quick actions and keeps low stock behind a count toggle', () => {
   renderDashboard();
-  expect(screen.getByRole('link', { name: /Record sale/ })).toHaveAttribute('href', '/sales/new');
+  const recordSale = screen.getByRole('link', { name: /Record sale/ });
+  expect(recordSale).toHaveAttribute('href', '/sales/new');
   expect(screen.getByRole('link', { name: /Add product/ })).toHaveAttribute('href', '/products/new');
   expect(screen.getByRole('link', { name: /Inventory/ })).toHaveAttribute('href', '/products');
   const lowStockToggle = screen.getByRole('button', { name: /Low stock/ });
+  expect(lowStockToggle.parentElement?.firstElementChild).toBe(lowStockToggle);
+  expect(lowStockToggle.parentElement?.lastElementChild).toBe(recordSale);
   expect(lowStockToggle).toHaveAttribute('aria-expanded', 'false');
   fireEvent.click(lowStockToggle);
   expect(lowStockToggle).toHaveAttribute('aria-expanded', 'true');
   expect(screen.getByText('Stock levels look healthy right now.')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Coming soon' })).toBeDisabled();
+  expect(screen.queryByRole('button', { name: 'Coming soon' })).not.toBeInTheDocument();
+  expect(screen.queryByText(/^Updated /)).not.toBeInTheDocument();
 });
 
 test('keeps available dashboard sections visible when one endpoint fails', () => {

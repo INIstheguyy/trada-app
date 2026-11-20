@@ -2347,9 +2347,10 @@ html.access-viewport-locked #root {
   font-weight: 750;
 }
 .input-mode-button {
-  min-width: 92px;
-  min-height: 78px;
-  padding: 11px 14px;
+  width: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  padding: 10px;
   border: 0;
   border-radius: 10px;
   color: var(--sd-text-secondary);
@@ -2358,7 +2359,6 @@ html.access-viewport-locked #root {
   display: grid;
   justify-items: center;
   align-content: center;
-  gap: 7px;
   font: inherit;
   transition:
     color 160ms ease,

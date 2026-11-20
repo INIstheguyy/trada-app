@@ -81,17 +81,16 @@ export function SalesListPage() {
       <div className="sales-control-toolbar" aria-label="Sales actions">
         <div className="input-mode-action" aria-label="New sale options">
           <span className="input-mode-action__label">New sale</span>
-          <div className="input-mode-switcher" aria-label="Record sale with">
+          <div className="input-mode-switcher" aria-label="Choose new sale input method">
             <Link
               className="input-mode-button input-mode-button--primary"
               to="/sales/new?mode=voice"
+              aria-label="New sale with voice"
             >
-              <span><Mic aria-hidden="true" size={21} /></span>
-              <span>Voice</span>
+              <Mic aria-hidden="true" size={21} />
             </Link>
-            <Link className="input-mode-button" to="/sales/new">
-              <span><Keyboard aria-hidden="true" size={21} /></span>
-              <span>Text</span>
+            <Link className="input-mode-button" to="/sales/new" aria-label="New sale with text">
+              <Keyboard aria-hidden="true" size={21} />
             </Link>
           </div>
         </div>

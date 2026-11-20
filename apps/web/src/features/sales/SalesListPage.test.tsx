@@ -100,8 +100,8 @@ test('provides direct voice and text sale input modes in the toolbar', () => {
     </MemoryRouter>,
   );
   const toolbar = screen.getByLabelText('Sales actions');
-  expect(screen.getByRole('link', { name: 'Voice' })).toHaveAttribute('href', '/sales/new?mode=voice');
-  expect(screen.getByRole('link', { name: 'Text' })).toHaveAttribute('href', '/sales/new');
+  expect(screen.getByRole('link', { name: 'New sale with voice' })).toHaveAttribute('href', '/sales/new?mode=voice');
+  expect(screen.getByRole('link', { name: 'New sale with text' })).toHaveAttribute('href', '/sales/new');
   expect(toolbar).toBeInTheDocument();
 });
 

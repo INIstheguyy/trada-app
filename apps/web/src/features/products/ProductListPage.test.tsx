@@ -130,8 +130,8 @@ test('sends supported type, status and search filters to the product query', () 
 test('provides direct voice, image and text product input modes in the toolbar', () => {
   renderPage();
   const toolbar = screen.getByLabelText('Inventory actions');
-  expect(within(toolbar).getByRole('link', { name: 'Voice' })).toHaveAttribute('href', '/products/new?mode=voice');
-  expect(within(toolbar).getByRole('link', { name: 'Image' })).toHaveAttribute('href', '/products/new?mode=image');
-  expect(within(toolbar).getByRole('link', { name: 'Text' })).toHaveAttribute('href', '/products/new');
+  expect(within(toolbar).getByRole('link', { name: 'New product with voice' })).toHaveAttribute('href', '/products/new?mode=voice');
+  expect(within(toolbar).getByRole('link', { name: 'New product with image' })).toHaveAttribute('href', '/products/new?mode=image');
+  expect(within(toolbar).getByRole('link', { name: 'New product with text' })).toHaveAttribute('href', '/products/new');
   expect(within(toolbar).getByRole('button', { name: 'Filter' })).toBeInTheDocument();
 });

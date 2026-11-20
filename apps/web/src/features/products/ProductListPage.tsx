@@ -85,21 +85,27 @@ export function ProductListPage() {
           <>
             <div className="input-mode-action" aria-label="New product options">
               <span className="input-mode-action__label">New product</span>
-              <div className="input-mode-switcher" aria-label="Add product with">
+              <div className="input-mode-switcher" aria-label="Choose new product input method">
                 <Link
                   className="input-mode-button input-mode-button--primary"
                   to="/products/new?mode=voice"
+                  aria-label="New product with voice"
                 >
-                  <span><Mic aria-hidden="true" size={21} /></span>
-                  <span>Voice</span>
+                  <Mic aria-hidden="true" size={21} />
                 </Link>
-                <Link className="input-mode-button" to="/products/new?mode=image">
-                  <span><Camera aria-hidden="true" size={21} /></span>
-                  <span>Image</span>
+                <Link
+                  className="input-mode-button"
+                  to="/products/new?mode=image"
+                  aria-label="New product with image"
+                >
+                  <Camera aria-hidden="true" size={21} />
                 </Link>
-                <Link className="input-mode-button" to="/products/new">
-                  <span><Keyboard aria-hidden="true" size={21} /></span>
-                  <span>Text</span>
+                <Link
+                  className="input-mode-button"
+                  to="/products/new"
+                  aria-label="New product with text"
+                >
+                  <Keyboard aria-hidden="true" size={21} />
                 </Link>
               </div>
             </div>

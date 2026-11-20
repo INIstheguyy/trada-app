@@ -2333,6 +2333,33 @@ These items require clarification before the frontend treats the backend as the 
 
 **Next session target:** Run cross-breakpoint browser QA and live draft smoke tests, then refine spacing or copy only from observed evidence. Follow with the planned shared `useVoiceRecording` integration to remove duplicated recorder lifecycle code without changing the approved workflow.
 
+### Session 065 — Single-label icon input controls
+
+**Date:** 20 November 2026
+**Outcome:** Consolidated creation labels to one New sale or New product label per input control group.
+
+**Completed:**
+
+- Replaced repeated text inside individual mode buttons with a single contextual group label.
+- Left compact microphone, camera and keyboard icons as the visible mode controls.
+- Preserved explicit accessible labels for each input method and all direct-routing behavior.
+
+**Verification limitation:** Automated checks remain pending because the environment had already exhausted its available execution allowance in the preceding session.
+
+### Session 064 — Icon-led labelled creation actions
+
+**Date:** 20 November 2026
+**Outcome:** Simplified module creation controls so the icon communicates the input mode and every button is explicitly labelled with its destination record type.
+
+**Completed:**
+
+- Removed visible Voice, Image and Text mode captions from the module action buttons.
+- Labelled each Sales action button New sale and each Products action button New product, while preserving its distinct input-mode icon.
+- Kept specific accessible names (for example, New product with image) so the icon-only mode distinction remains available to assistive technology.
+- Updated regression assertions to the accessible button names.
+
+**Verification limitation:** Automated checks remain pending because the environment had already exhausted its available execution allowance in the preceding session.
+
 ### Session 063 — Context labels for module-level input modes
 
 **Date:** 20 November 2026

@@ -2326,65 +2326,72 @@ html.access-viewport-locked #root {
   font-size: 14px;
   line-height: 1.5;
 }
-.capture-mode-picker__options {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-.capture-mode-card {
-  min-height: 148px;
-  padding: 17px;
+.input-mode-switcher {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  padding: 5px;
   border: 1px solid var(--sd-border);
-  border-radius: 12px;
-  color: var(--sd-text-primary);
-  background: var(--sd-surface);
+  border-radius: 15px;
+  background: var(--sd-surface-soft);
+  gap: 5px;
+}
+.input-mode-action {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+.input-mode-action__label {
+  color: var(--sd-text-secondary);
+  font-size: 12px;
+  font-weight: 750;
+}
+.input-mode-button {
+  min-width: 92px;
+  min-height: 78px;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--sd-text-secondary);
+  background: transparent;
   cursor: pointer;
   display: grid;
-  align-content: start;
-  gap: 8px;
-  text-align: left;
+  justify-items: center;
+  align-content: center;
+  gap: 7px;
+  font: inherit;
   transition:
-    border-color 160ms ease,
+    color 160ms ease,
+    background 160ms ease,
     box-shadow 160ms ease,
     transform 160ms ease;
 }
-.capture-mode-card:hover {
-  border-color: var(--sd-teal-500);
-  box-shadow: 0 10px 24px rgba(13, 27, 75, 0.1);
+.input-mode-button:hover {
+  color: var(--sd-teal-700);
+  background: color-mix(in srgb, var(--sd-teal-100) 64%, transparent);
   transform: translateY(-1px);
 }
-.capture-mode-card:focus-visible {
+.input-mode-button:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--sd-teal-500) 45%, transparent);
   outline-offset: 2px;
 }
-.capture-mode-card > span {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  color: var(--sd-teal-700);
-  background: var(--sd-teal-100);
+.input-mode-button > span:first-child {
   display: grid;
   place-items: center;
 }
-.capture-mode-card strong {
-  font-size: 14px;
-}
-.capture-mode-card small {
-  color: var(--sd-text-muted);
+.input-mode-button > span:last-child {
   font-size: 12px;
+  font-weight: 750;
   line-height: 1.4;
 }
-.capture-mode-card--primary {
-  border-color: var(--sd-navy-900);
+.input-mode-button--primary {
   color: white;
   background: linear-gradient(145deg, var(--sd-navy-900), var(--sd-teal-700));
+  box-shadow: 0 5px 12px rgba(13, 27, 75, 0.16);
 }
-.capture-mode-card--primary > span {
-  color: var(--sd-navy-900);
-  background: white;
-}
-.capture-mode-card--primary small {
-  color: color-mix(in srgb, white 78%, transparent);
+.input-mode-button--primary:hover {
+  color: white;
+  background: linear-gradient(145deg, var(--sd-navy-900), var(--sd-teal-700));
 }
 .capture-mode-picker__file-input {
   display: none;
@@ -2546,11 +2553,12 @@ html.access-viewport-locked #root {
   }
 }
 @media (max-width: 720px) {
-  .capture-mode-picker__options {
-    grid-template-columns: 1fr;
+  .input-mode-switcher {
+    width: 100%;
   }
-  .capture-mode-card {
-    min-height: 116px;
+  .input-mode-button {
+    flex: 1 1 0;
+    min-width: 0;
   }
 }
 .voice-draft-entry__actions,

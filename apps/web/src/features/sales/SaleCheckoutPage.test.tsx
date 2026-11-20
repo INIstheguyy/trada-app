@@ -27,7 +27,7 @@ vi.mock('../../lib/api', async (importOriginal) => {
   };
 });
 
-test('separates voice and manual sale capture from the entry choice', () => {
+test('opens the manual sale form directly by default', () => {
   render(
     <Provider store={store}>
       <MemoryRouter>
@@ -35,33 +35,22 @@ test('separates voice and manual sale capture from the entry choice', () => {
       </MemoryRouter>
     </Provider>,
   );
-
-  expect(
-    screen.getByRole('heading', { name: 'How would you like to record this sale?' }),
-  ).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Record with voice' })).toBeInTheDocument();
-  expect(screen.queryByText('Booked revenue')).not.toBeInTheDocument();
-
-  fireEvent.click(screen.getByRole('button', { name: 'Type manually' }));
 
   expect(screen.getByText('Booked revenue')).toBeInTheDocument();
   expect(screen.getAllByText('Amount received')).toHaveLength(2);
   expect(screen.getByText('Balance due')).toBeInTheDocument();
   expect(screen.getByText('Record only money already received.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Confirm and record sale' })).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Record with voice' })).not.toBeInTheDocument();
 });
 
 test('shows the voice countdown before requesting microphone access', () => {
   render(
     <Provider store={store}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/sales/new?mode=voice']}>
         <SaleCheckoutPage />
       </MemoryRouter>
     </Provider>,
   );
-
-  fireEvent.click(screen.getByRole('button', { name: 'Record with voice' }));
 
   expect(screen.getByRole('heading', { name: 'Recording starts in 3' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Starting in 3' })).toBeDisabled();
@@ -83,13 +72,11 @@ test('prepares a non-persisted voice draft before it changes checkout', async ()
 
   render(
     <Provider store={store}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/sales/new?mode=voice']}>
         <SaleCheckoutPage />
       </MemoryRouter>
     </Provider>,
   );
-
-  fireEvent.click(screen.getByRole('button', { name: 'Record with voice' }));
 
   fireEvent.change(screen.getByLabelText('Sale description'), {
     target: { value: 'Musa bought three bags of rice and paid 120k by transfer.' },

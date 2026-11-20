@@ -14,9 +14,10 @@ import {
   ArrowLeft,
   ArrowRight,
   Boxes,
+  Camera,
   ChevronDown,
+  Keyboard,
   Mic,
-  PackagePlus,
   RefreshCw,
   Search,
   SlidersHorizontal,
@@ -82,16 +83,26 @@ export function ProductListPage() {
       <div className="inventory-control-toolbar" aria-label="Inventory actions">
         {can(role, 'product:create') && (
           <>
-            <Button asChild>
-              <Link to="/products/new">
-                <PackagePlus aria-hidden="true" size={18} /> Add product
-              </Link>
-            </Button>
-            <Button asChild variant="secondary">
-              <Link to="/products/new?ai=voice">
-                <Mic aria-hidden="true" size={17} /> Voice product
-              </Link>
-            </Button>
+            <div className="input-mode-action" aria-label="New product options">
+              <span className="input-mode-action__label">New product</span>
+              <div className="input-mode-switcher" aria-label="Add product with">
+                <Link
+                  className="input-mode-button input-mode-button--primary"
+                  to="/products/new?mode=voice"
+                >
+                  <span><Mic aria-hidden="true" size={21} /></span>
+                  <span>Voice</span>
+                </Link>
+                <Link className="input-mode-button" to="/products/new?mode=image">
+                  <span><Camera aria-hidden="true" size={21} /></span>
+                  <span>Image</span>
+                </Link>
+                <Link className="input-mode-button" to="/products/new">
+                  <span><Keyboard aria-hidden="true" size={21} /></span>
+                  <span>Text</span>
+                </Link>
+              </div>
+            </div>
           </>
         )}
         <Button

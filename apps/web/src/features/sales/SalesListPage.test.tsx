@@ -93,6 +93,18 @@ test('uses the reference hero and keeps summary cards to title and value only', 
   expect(screen.queryByText('Qualified')).not.toBeInTheDocument();
 });
 
+test('provides direct voice and text sale input modes in the toolbar', () => {
+  render(
+    <MemoryRouter>
+      <SalesListPage />
+    </MemoryRouter>,
+  );
+  const toolbar = screen.getByLabelText('Sales actions');
+  expect(screen.getByRole('link', { name: 'Voice' })).toHaveAttribute('href', '/sales/new?mode=voice');
+  expect(screen.getByRole('link', { name: 'Text' })).toHaveAttribute('href', '/sales/new');
+  expect(toolbar).toBeInTheDocument();
+});
+
 test('presents each sale as a compact product, time, payment-method and total row', () => {
   render(
     <MemoryRouter>

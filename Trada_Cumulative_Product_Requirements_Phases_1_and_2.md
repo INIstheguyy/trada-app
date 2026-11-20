@@ -794,7 +794,7 @@ At the end of every substantive delivery session, the team should update:
 | Products and low-stock alerts     | **Implemented and verified**     | Searchable/paginated list, low-stock summary, create, detail/edit and guarded delete routes are implemented against the documented contract. Live backend testing was intentionally deferred.                                                                                                                                            |
 | Sales and sales analytics         | **Implemented and verified**     | Protected checkout, filtered/paginated history, detail, guarded cancellation/restock and analytics are implemented against the documented contract. Revenue, received amount and balance due remain distinct. Live backend testing was intentionally deferred.                                                                           |
 | Full production RBAC              | **Blocked by decision/contract** | Backend documentation exposes a generic `user` role but no staff membership, permission, branch, approval or authorization-denied contract.                                                                                                                                                                                              |
-| AI capture and draft review       | **Partially defined**            | New sale and product workflows begin with an explicit capture-method choice. Voice selection shows an animated waveform and a three-second countdown before requesting microphone access; after recording stops, its completed audio is sent for a draft request. Manual selection opens only the existing editable form. Product image selection opens an `environment` camera capture on supporting mobile browsers and the normal file picker on desktop. Applying an AI draft opens the existing editable form, and persistence still requires the normal explicit submit action. The mobile centre launcher routes permitted users to these focused draft-only workflows; product-update suggestions remain separately guarded. Unified AI, live transcription, confidence, idempotency, inventory authorization/audit and production release gates remain unresolved. |
+| AI capture and draft review       | **Partially defined**            | Sales and Products expose their available Voice, Image and/or Text input controls directly in their module action bars; each control routes straight to its matching input stage. Voice selection shows an animated waveform and a three-second countdown before requesting microphone access; after recording stops, its completed audio is sent for a draft request. Text opens only the existing editable form. Product image selection opens an `environment` camera capture on supporting mobile browsers and the normal file picker on desktop. Applying an AI draft opens the existing editable form, and persistence still requires the normal explicit submit action. The mobile centre launcher routes permitted users to these focused draft-only workflows; product-update suggestions remain separately guarded. Unified AI, live transcription, confidence, idempotency, inventory authorization/audit and production release gates remain unresolved. |
 | Expenses, purchases and suppliers | **Planned**                      | Required by the PRD but not present in the received backend contract.                                                                                                                                                                                                                                                                    |
 | Storefront and marketing          | **Planned**                      | Required direction, but no received backend contract yet.                                                                                                                                                                                                                                                                                |
 
@@ -2332,6 +2332,56 @@ These items require clarification before the frontend treats the backend as the 
 **Delivery risks and limitations:** Microphone permission, noisy counter environments and unsupported recording APIs can still interrupt the primary path, so manual and typed fallbacks remain essential. Browser-level visual inspection at phone, tablet and desktop widths and a live microphone/image smoke test with a non-sensitive backend workspace remain required before release acceptance.
 
 **Next session target:** Run cross-breakpoint browser QA and live draft smoke tests, then refine spacing or copy only from observed evidence. Follow with the planned shared `useVoiceRecording` integration to remove duplicated recorder lifecycle code without changing the approved workflow.
+
+### Session 063 — Context labels for module-level input modes
+
+**Date:** 20 November 2026
+**Outcome:** Added explicit “New sale” and “New product” labels to the respective module-level input controls.
+
+**Completed:**
+
+- Grouped the Sales Voice/Text selector beneath a clear New sale label.
+- Grouped the Products Voice/Image/Text selector beneath a clear New product label.
+- Preserved the direct routing and input-mode behavior introduced in Session 062.
+
+**Verification limitation:** Automated checks remain pending because the environment had already exhausted its available execution allowance in the preceding session.
+
+### Session 062 — Direct module-level input-mode routing
+
+**Date:** 20 November 2026
+**Outcome:** Removed the separate capture-method page. Input-mode icons now appear directly in the Sales and Products module action bars and route immediately to the corresponding input stage.
+
+**Completed:**
+
+- Replaced Sales' previous Record sale and Voice sale actions with direct Voice and Text icon controls.
+- Replaced Products' previous Add product and Voice product actions with direct Voice, Image and Text icon controls.
+- Routed Voice controls to the countdown-and-recording stage, Product Image to the image-draft stage, and Text to the existing manual form.
+- Removed the former intermediate capture-method chooser from the new-sale and new-product pages.
+- Updated focused regression expectations for direct routes and modes.
+
+**Verification limitation:** Automated formatting, focused test and TypeScript commands could not be run after these final edits because the environment rejected further execution after its Codex usage allowance was exhausted. Verification must be rerun before release acceptance.
+
+**Product presentation decision:** Input method is selected from the originating module, not from a subsequent creation-page choice. The destination-specific AI draft, review and persistence safeguards remain unchanged.
+
+**Next session target:** Run formatting, focused list and capture-flow tests, then TypeScript and browser QA once execution capacity is available.
+
+### Session 061 — Compact icon input-mode selector
+
+**Date:** 20 November 2026
+**Outcome:** Replaced the large capture-method cards with one compact, reusable icon-led input selector.
+
+**Completed:**
+
+- Added a shared visual selector pattern with distinct Voice, Image and Text icon buttons.
+- Applied the three-mode selector to new-product capture and the supported Voice/Text subset to new-sale capture.
+- Preserved existing accessible button names, countdown behavior, camera/file-picker invocation and direct manual-form routing.
+- Made the selector responsive so the compact options share available mobile width without changing their tap targets.
+
+**Verification:** Focused sale and product capture tests passed (5 tests across 2 files). TypeScript passed.
+
+**Product presentation decision:** The initial capture choice is now a compact icon-led selector rather than a set of explanatory cards. This changes entry-screen hierarchy only; supported modes and their draft-review boundaries remain unchanged.
+
+**Next session target:** Validate the compact selector on real phone widths and adjust only if observed tap-target or label legibility issues arise.
 
 ### Session 060 — Voice-capture waveform and preview refinement
 

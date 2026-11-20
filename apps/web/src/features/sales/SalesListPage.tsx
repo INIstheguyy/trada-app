@@ -4,9 +4,9 @@ import {
   ArrowLeft,
   ArrowRight,
   ChevronDown,
+  Keyboard,
   ListFilter,
   Mic,
-  Plus,
   ReceiptText,
   RefreshCw,
   Search,
@@ -79,16 +79,22 @@ export function SalesListPage() {
       />
 
       <div className="sales-control-toolbar" aria-label="Sales actions">
-        <Button asChild>
-          <Link to="/sales/new">
-            <Plus aria-hidden="true" size={18} /> Record sale
-          </Link>
-        </Button>
-        <Button asChild variant="secondary">
-          <Link to="/sales/new?ai=voice">
-            <Mic aria-hidden="true" size={17} /> Voice sale
-          </Link>
-        </Button>
+        <div className="input-mode-action" aria-label="New sale options">
+          <span className="input-mode-action__label">New sale</span>
+          <div className="input-mode-switcher" aria-label="Record sale with">
+            <Link
+              className="input-mode-button input-mode-button--primary"
+              to="/sales/new?mode=voice"
+            >
+              <span><Mic aria-hidden="true" size={21} /></span>
+              <span>Voice</span>
+            </Link>
+            <Link className="input-mode-button" to="/sales/new">
+              <span><Keyboard aria-hidden="true" size={21} /></span>
+              <span>Text</span>
+            </Link>
+          </div>
+        </div>
         <Button
           className="sales-filter-toggle"
           type="button"

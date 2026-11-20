@@ -127,16 +127,11 @@ test('sends supported type, status and search filters to the product query', () 
   });
 });
 
-test('centres inventory creation and filter actions in one toolbar', () => {
+test('provides direct voice, image and text product input modes in the toolbar', () => {
   renderPage();
   const toolbar = screen.getByLabelText('Inventory actions');
-  expect(within(toolbar).getByRole('link', { name: 'Add product' })).toHaveAttribute(
-    'href',
-    '/products/new',
-  );
-  expect(within(toolbar).getByRole('link', { name: 'Voice product' })).toHaveAttribute(
-    'href',
-    '/products/new?ai=voice',
-  );
+  expect(within(toolbar).getByRole('link', { name: 'Voice' })).toHaveAttribute('href', '/products/new?mode=voice');
+  expect(within(toolbar).getByRole('link', { name: 'Image' })).toHaveAttribute('href', '/products/new?mode=image');
+  expect(within(toolbar).getByRole('link', { name: 'Text' })).toHaveAttribute('href', '/products/new');
   expect(within(toolbar).getByRole('button', { name: 'Filter' })).toBeInTheDocument();
 });

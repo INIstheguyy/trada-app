@@ -1,7 +1,6 @@
 import { Alert, Button, FormField, Input, PageHeader, Select, Surface, Textarea } from '@trada/ui';
 import {
   FilePenLine,
-  Keyboard,
   Mic,
   Minus,
   Plus,
@@ -44,9 +43,9 @@ const maxAudioDurationSeconds = 60;
 export function SaleCheckoutPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const voiceRequested = searchParams.get('ai') === 'voice';
-  const [captureMode, setCaptureMode] = useState<'choose' | 'voice' | 'manual'>(
-    voiceRequested ? 'voice' : 'choose',
+  const voiceRequested = searchParams.get('mode') === 'voice' || searchParams.get('ai') === 'voice';
+  const [captureMode, setCaptureMode] = useState<'voice' | 'manual'>(
+    voiceRequested ? 'voice' : 'manual',
   );
   const [voiceCountdown, setVoiceCountdown] = useState<number | null>(voiceRequested ? 3 : null);
   const {
@@ -405,9 +404,7 @@ export function SaleCheckoutPage() {
         eyebrow="New receipt"
         title="Record a sale"
         description={
-          captureMode === 'choose'
-            ? 'Choose how you want to record this sale.'
-            : captureMode === 'voice'
+          captureMode === 'voice'
               ? 'Speak naturally and let Trada prepare a sale draft for you to review.'
               : 'Review the cart, payment received and any outstanding balance before saving.'
         }
@@ -418,41 +415,6 @@ export function SaleCheckoutPage() {
       >
         <div className="checkout-main">
           {error && <Alert tone="error">{error}</Alert>}
-          {captureMode === 'choose' && (
-            <Surface className="checkout-section capture-mode-picker">
-              <div className="capture-mode-picker__heading">
-                <span>Choose a recording method</span>
-                <h2>How would you like to record this sale?</h2>
-                <p>Voice is fastest at the counter. You can still type every detail manually.</p>
-              </div>
-              <div className="capture-mode-picker__options">
-                <button
-                  className="capture-mode-card capture-mode-card--primary"
-                  type="button"
-                  aria-label="Record with voice"
-                  onClick={chooseVoiceCapture}
-                >
-                  <span>
-                    <Mic aria-hidden="true" size={24} />
-                  </span>
-                  <strong>Record with voice</strong>
-                  <small>Starts recording after a 3-second countdown</small>
-                </button>
-                <button
-                  className="capture-mode-card"
-                  type="button"
-                  aria-label="Type manually"
-                  onClick={() => setCaptureMode('manual')}
-                >
-                  <span>
-                    <Keyboard aria-hidden="true" size={24} />
-                  </span>
-                  <strong>Type manually</strong>
-                  <small>Open the existing sale form</small>
-                </button>
-              </div>
-            </Surface>
-          )}
           {captureMode === 'voice' && (
             <section
               className="voice-entry-target"
@@ -601,7 +563,7 @@ export function SaleCheckoutPage() {
                       variant="secondary"
                       onClick={() => {
                         setVoiceCountdown(null);
-                        setCaptureMode('choose');
+                        setCaptureMode('manual');
                       }}
                     >
                       Cancel countdown

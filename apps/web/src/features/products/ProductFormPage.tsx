@@ -14,7 +14,6 @@ import {
   Boxes,
   Camera,
   FilePenLine,
-  Keyboard,
   Mic,
   PackageCheck,
   Square,
@@ -119,9 +118,10 @@ export function ProductFormPage() {
   const [searchParams] = useSearchParams();
   const user = useAppSelector((state) => state.auth.user);
   const role = normalizeRole(user?.role ?? 'user');
-  const voiceRequested = searchParams.get('ai') === 'voice';
-  const [captureMode, setCaptureMode] = useState<'choose' | 'voice' | 'image' | 'manual'>(
-    voiceRequested ? 'voice' : 'choose',
+  const requestedMode = searchParams.get('mode') ?? (searchParams.get('ai') === 'voice' ? 'voice' : 'manual');
+  const voiceRequested = requestedMode === 'voice';
+  const [captureMode, setCaptureMode] = useState<'voice' | 'image' | 'manual'>(
+    requestedMode === 'image' ? 'image' : voiceRequested ? 'voice' : 'manual',
   );
   const [voiceCountdown, setVoiceCountdown] = useState<number | null>(voiceRequested ? 3 : null);
   const {
@@ -568,9 +568,7 @@ export function ProductFormPage() {
         description={
           isEditing
             ? 'Update the selling details and stock information recorded for this product.'
-            : captureMode === 'choose'
-              ? 'Choose the quickest way to add this product.'
-              : captureMode === 'voice'
+            : captureMode === 'voice'
                 ? 'Describe the product and let Trada prepare an editable draft.'
                 : captureMode === 'image'
                   ? 'Use a product or package image to prepare an editable draft.'
@@ -596,54 +594,6 @@ export function ProductFormPage() {
             {error}
           </Alert>
         )}
-        {!isEditing && captureMode === 'choose' && (
-          <Surface className="product-form-section capture-mode-picker">
-            <div className="capture-mode-picker__heading">
-              <span>Choose a capture method</span>
-              <h2>How would you like to add this product?</h2>
-              <p>Start with voice, a photo, or the existing product form.</p>
-            </div>
-            <div className="capture-mode-picker__options">
-              <button
-                className="capture-mode-card capture-mode-card--primary"
-                type="button"
-                aria-label="Record with voice"
-                onClick={chooseVoiceCapture}
-              >
-                <span>
-                  <Mic aria-hidden="true" size={24} />
-                </span>
-                <strong>Record with voice</strong>
-                <small>Starts recording after a 3-second countdown</small>
-              </button>
-              <button
-                className="capture-mode-card"
-                type="button"
-                aria-label="Capture or upload an image"
-                onClick={() => imageInputRef.current?.click()}
-              >
-                <span>
-                  <Camera aria-hidden="true" size={24} />
-                </span>
-                <strong>Capture or upload an image</strong>
-                <small>Opens your camera on supported phones, or a file picker on desktop</small>
-              </button>
-              <button
-                className="capture-mode-card"
-                type="button"
-                aria-label="Type manually"
-                onClick={() => setCaptureMode('manual')}
-              >
-                <span>
-                  <Keyboard aria-hidden="true" size={24} />
-                </span>
-                <strong>Type manually</strong>
-                <small>Open the existing product form</small>
-              </button>
-            </div>
-          </Surface>
-        )}
-
         {!isEditing && captureMode === 'voice' && (
           <section
             className="voice-entry-target"
@@ -806,7 +756,7 @@ export function ProductFormPage() {
                     variant="secondary"
                     onClick={() => {
                       setVoiceCountdown(null);
-                      setCaptureMode('choose');
+                      setCaptureMode('manual');
                     }}
                   >
                     Cancel countdown

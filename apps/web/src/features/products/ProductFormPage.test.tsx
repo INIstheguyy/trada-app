@@ -9,10 +9,10 @@ import { ProductFormPage } from './ProductFormPage';
 
 afterEach(cleanup);
 
-function renderNewProduct() {
+function renderNewProduct(path = '/products/new') {
   return render(
     <Provider store={store}>
-      <MemoryRouter initialEntries={['/products/new']}>
+      <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/products/new" element={<ProductFormPage />} />
         </Routes>
@@ -21,25 +21,26 @@ function renderNewProduct() {
   );
 }
 
-test('separates voice, image and manual product capture from the entry choice', () => {
+test('opens the manual product form directly by default', () => {
   renderNewProduct();
 
-  expect(
-    screen.getByRole('heading', { name: 'How would you like to add this product?' }),
-  ).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Record with voice' })).toBeInTheDocument();
-  expect(screen.getByLabelText('Product image')).toHaveAttribute('capture', 'environment');
-  expect(screen.queryByLabelText(/^Product name/)).not.toBeInTheDocument();
+  expect(screen.getByLabelText(/^Product name/)).toBeRequired();
+  expect(screen.queryByRole('heading', { name: 'How would you like to add this product?' })).not.toBeInTheDocument();
+});
 
-  fireEvent.click(screen.getByRole('button', { name: 'Record with voice' }));
+test('opens voice and image input stages directly from their selected mode', () => {
+  const { unmount } = renderNewProduct('/products/new?mode=voice');
   expect(screen.getByRole('heading', { name: 'Recording starts in 3' })).toBeInTheDocument();
   expect(document.querySelector('.focused-capture__wave')).toBeInTheDocument();
+  unmount();
+
+  renderNewProduct('/products/new?mode=image');
+  expect(screen.getByRole('heading', { name: 'Add product from image' })).toBeInTheDocument();
+  expect(screen.getByLabelText('Product image')).toHaveAttribute('capture', 'environment');
 });
 
 test('collects the critical product, price and stock fields in manual review', () => {
   renderNewProduct();
-
-  fireEvent.click(screen.getByRole('button', { name: 'Type manually' }));
 
   expect(screen.getByRole('heading', { name: 'Add a product' })).toBeInTheDocument();
   expect(screen.getByLabelText(/^Product name/)).toBeRequired();

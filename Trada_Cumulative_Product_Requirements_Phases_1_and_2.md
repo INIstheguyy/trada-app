@@ -2333,6 +2333,71 @@ These items require clarification before the frontend treats the backend as the 
 
 **Next session target:** Run cross-breakpoint browser QA and live draft smoke tests, then refine spacing or copy only from observed evidence. Follow with the planned shared `useVoiceRecording` integration to remove duplicated recorder lifecycle code without changing the approved workflow.
 
+### Session 070 — Align module input controls with filters
+
+**Date:** 20 November 2026
+**Outcome:** Corrected the vertical misalignment between the creation input controls and Filter button.
+
+**Completed:**
+
+- Changed both module toolbars from baseline to center alignment.
+- Made the single New sale/New product label and its mode icons one horizontal action group, so the actual icons align with Filter.
+
+**Verification limitation:** Automated checks remain pending because the environment had already exhausted its available execution allowance in the preceding session.
+
+### Session 069 — Module controls below summary cards
+
+**Date:** 20 November 2026
+**Outcome:** Moved the Sales and Products creation/input controls from below their page headings to the space between their summary content and list panels.
+
+**Completed:**
+
+- Positioned Sales controls after sales summary cards and before the sales list panel.
+- Positioned Products controls after inventory summary and low-stock feedback, immediately before the products list panel.
+- Changed both toolbars to flex their creation input controls and Filter button to opposite ends with baseline alignment.
+
+**Verification limitation:** Automated checks remain pending because the environment had already exhausted its available execution allowance in the preceding session.
+
+### Session 068 — Invalidate discarded audio before request start
+
+**Date:** 20 November 2026
+**Outcome:** Closed a race where discarded audio could still produce a late AI review draft while its local audio encoding was completing.
+
+**Completed:**
+
+- Added a per-preview request generation token for sale and product audio capture.
+- Invalidated that token on discard, in addition to aborting an already-issued network request.
+- Checked the token before starting the draft request and before accepting its result or error, preventing the discarded preview from rendering a Review AI draft panel.
+
+**Verification limitation:** Automated checks remain pending because the environment had already exhausted its available execution allowance in the preceding session.
+
+### Session 067 — Abort discarded voice-draft processing
+
+**Date:** 20 November 2026
+**Outcome:** Discarding a completed voice preview now cancels its corresponding in-flight AI draft request.
+
+**Completed:**
+
+- Retained the abort handle returned by the sale and product AI draft mutations.
+- Aborted the request when the user discards the audio preview or leaves the capture screen.
+- Cleared preview, draft and voice-error state on discard, and ignored any late result from the canceled request.
+
+**Verification limitation:** Automated checks remain pending because the environment had already exhausted its available execution allowance in the preceding session.
+
+### Session 066 — Continuous countdown-to-recording transition
+
+**Date:** 20 November 2026
+**Outcome:** Removed the brief idle recording state that could appear between the voice countdown and active microphone capture.
+
+**Completed:**
+
+- Added an explicit microphone-starting state for both sale and product voice capture.
+- Kept the animated capture treatment visible while the browser resolves microphone permissions and initializes recording.
+- Replaced the transient idle/re-record appearance with Starting microphone and Waiting for microphone access feedback.
+- Preserved the error fallback and post-recording re-record option.
+
+**Verification limitation:** Automated checks remain pending because the environment had already exhausted its available execution allowance in the preceding session.
+
 ### Session 065 — Single-label icon input controls
 
 **Date:** 20 November 2026

@@ -76,6 +76,7 @@ export function SaleCheckoutPage() {
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [voiceDraft, setVoiceDraft] = useState<VoiceSaleDraft>();
   const [voiceError, setVoiceError] = useState<string>();
+  const [isStartingVoice, setIsStartingVoice] = useState(false);
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [recordingElapsedSeconds, setRecordingElapsedSeconds] = useState(0);
   const [audioPreview, setAudioPreview] = useState<VoiceRecordingPreview>();
@@ -84,6 +85,8 @@ export function SaleCheckoutPage() {
   const recordedAudioChunksRef = useRef<Blob[]>([]);
   const recordingStartedAtRef = useRef<number | null>(null);
   const audioPreviewUrlRef = useRef<string | null>(null);
+  const voiceDraftRequestRef = useRef<{ abort: () => void } | null>(null);
+  const voicePreviewRequestIdRef = useRef(0);
   const saleIdempotencyKeyRef = useRef<string | undefined>(undefined);
   const voiceEntryRef = useRef<HTMLElement | null>(null);
 
@@ -91,6 +94,7 @@ export function SaleCheckoutPage() {
     () => () => {
       mediaRecorderRef.current?.stop();
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      voiceDraftRequestRef.current?.abort();
       if (audioPreviewUrlRef.current) URL.revokeObjectURL(audioPreviewUrlRef.current);
     },
     [],
@@ -99,6 +103,7 @@ export function SaleCheckoutPage() {
   useEffect(() => {
     if (captureMode !== 'voice' || voiceCountdown === null) return;
     if (voiceCountdown === 0) {
+      setIsStartingVoice(true);
       setVoiceCountdown(null);
       void startVoiceRecording();
       return;
@@ -193,30 +198,38 @@ export function SaleCheckoutPage() {
     );
   }
 
-  async function generateVoiceDraft(input: VoiceSaleDraftRequest) {
+  async function generateVoiceDraft(input: VoiceSaleDraftRequest, previewRequestId?: number) {
     setVoiceError(undefined);
     setVoiceDraft(undefined);
+    const request = createVoiceSaleDraft(input);
+    voiceDraftRequestRef.current = request;
     try {
-      const draft = await createVoiceSaleDraft(input).unwrap();
+      const draft = await request.unwrap();
+      if (voiceDraftRequestRef.current !== request || (previewRequestId !== undefined && voicePreviewRequestIdRef.current !== previewRequestId)) return;
       setVoiceDraft(draft);
     } catch (reason) {
+      if (voiceDraftRequestRef.current !== request || (previewRequestId !== undefined && voicePreviewRequestIdRef.current !== previewRequestId)) return;
       setVoiceError(
         readApiError(
           reason,
           'We couldn’t prepare a sale draft. You can continue with manual checkout.',
         ),
       );
+    } finally {
+      if (voiceDraftRequestRef.current === request) voiceDraftRequestRef.current = null;
     }
   }
 
   async function startVoiceRecording() {
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setIsStartingVoice(false);
       setVoiceError(
         'Voice recording is not supported in this browser. Type the sale description instead.',
       );
       return;
     }
 
+    setIsStartingVoice(true);
     setVoiceError(undefined);
     setVoiceDraft(undefined);
     discardAudioPreview();
@@ -264,8 +277,10 @@ export function SaleCheckoutPage() {
         prepareCapturedAudio(recording, durationSeconds, recording.type || 'audio/webm');
       });
       recorder.start();
+      setIsStartingVoice(false);
       setIsRecordingVoice(true);
     } catch {
+      setIsStartingVoice(false);
       setVoiceError(
         'We could not access your microphone. Allow microphone access or type the sale description instead.',
       );
@@ -279,14 +294,20 @@ export function SaleCheckoutPage() {
   function chooseVoiceCapture() {
     setVoiceError(undefined);
     setVoiceDraft(undefined);
+    setIsStartingVoice(false);
     setCaptureMode('voice');
     setVoiceCountdown(3);
   }
 
   function discardAudioPreview() {
+    voicePreviewRequestIdRef.current += 1;
+    voiceDraftRequestRef.current?.abort();
+    voiceDraftRequestRef.current = null;
     if (audioPreviewUrlRef.current) URL.revokeObjectURL(audioPreviewUrlRef.current);
     audioPreviewUrlRef.current = null;
     setAudioPreview(undefined);
+    setVoiceDraft(undefined);
+    setVoiceError(undefined);
   }
 
   function prepareCapturedAudio(recording: Blob, durationSeconds: number, mimeType: string) {
@@ -298,7 +319,11 @@ export function SaleCheckoutPage() {
       setVoiceError('Keep voice recordings to 10 MB or less, then try again.');
       return;
     }
-    void recordingToDataUrl(recording).then((audio) => generateVoiceDraft({ audio, mimeType }));
+    const previewRequestId = ++voicePreviewRequestIdRef.current;
+    void recordingToDataUrl(recording).then((audio) => {
+      if (voicePreviewRequestIdRef.current !== previewRequestId) return;
+      void generateVoiceDraft({ audio, mimeType }, previewRequestId);
+    });
   }
 
   function prepareTypedVoiceDraft() {
@@ -436,7 +461,7 @@ export function SaleCheckoutPage() {
                 </ol>
                 <div className="focused-capture__hero">
                   <span
-                    className={`focused-capture__orb${isRecordingVoice ? ' is-listening' : ''}`}
+                    className={`focused-capture__orb${isRecordingVoice || isStartingVoice ? ' is-listening' : ''}`}
                   >
                     {isRecordingVoice ? (
                       <Square aria-hidden="true" size={28} fill="currentColor" />
@@ -448,6 +473,8 @@ export function SaleCheckoutPage() {
                     <h2>
                       {voiceCountdown !== null
                         ? `Recording starts in ${voiceCountdown}`
+                        : isStartingVoice
+                          ? 'Starting your microphone'
                         : isRecordingVoice
                           ? 'Listening to your sale'
                           : voiceDraftState.isLoading
@@ -457,17 +484,19 @@ export function SaleCheckoutPage() {
                     <p>
                       {voiceCountdown !== null
                         ? 'Get ready to speak naturally when the countdown finishes.'
+                        : isStartingVoice
+                          ? 'Allow microphone access if your browser asks for permission.'
                         : isRecordingVoice
                           ? 'Include the product, quantity, payment method and customer name.'
                           : 'Speak naturally. Trada prepares an editable draft; nothing is recorded yet.'}
                     </p>
                   </div>
-                  {voiceCountdown === null && !isRecordingVoice && (
+                  {voiceCountdown === null && !isStartingVoice && !isRecordingVoice && (
                     <p className="focused-capture__example">
                       “Four spanners, cash, sold to Biodun.”
                     </p>
                   )}
-                  {(voiceCountdown !== null || isRecordingVoice) && (
+                  {(voiceCountdown !== null || isStartingVoice || isRecordingVoice) && (
                     <div className="focused-capture__wave" aria-hidden="true">
                       {Array.from({ length: 11 }, (_, index) => (
                         <span key={index} />
@@ -479,9 +508,9 @@ export function SaleCheckoutPage() {
                   <Button
                     type="button"
                     loading={
-                      voiceDraftState.isLoading && !isRecordingVoice && voiceCountdown === null
+                      voiceDraftState.isLoading && !isStartingVoice && !isRecordingVoice && voiceCountdown === null
                     }
-                    disabled={voiceCountdown !== null}
+                    disabled={voiceCountdown !== null || isStartingVoice}
                     onClick={() => (isRecordingVoice ? stopVoiceRecording() : chooseVoiceCapture())}
                     icon={
                       isRecordingVoice ? (
@@ -493,12 +522,16 @@ export function SaleCheckoutPage() {
                   >
                     {voiceCountdown !== null
                       ? `Starting in ${voiceCountdown}`
+                      : isStartingVoice
+                        ? 'Starting microphone'
                       : isRecordingVoice
                         ? 'Stop and transcribe'
                         : 'Record again'}
                   </Button>
                   <small>
-                    {isRecordingVoice
+                    {isStartingVoice
+                      ? 'Waiting for microphone access.'
+                      : isRecordingVoice
                       ? `Recording ${formatRecordingDuration(recordingElapsedSeconds)} â€” tap stop when you have finished speaking.`
                       : 'AI drafts do not create a sale. Review before using any detail below.'}
                   </small>

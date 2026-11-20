@@ -78,45 +78,6 @@ export function SalesListPage() {
         description="Record sales, view performance and track revenue."
       />
 
-      <div className="sales-control-toolbar" aria-label="Sales actions">
-        <div className="input-mode-action" aria-label="New sale options">
-          <span className="input-mode-action__label">New sale</span>
-          <div className="input-mode-switcher" aria-label="Choose new sale input method">
-            <Link
-              className="input-mode-button input-mode-button--primary"
-              to="/sales/new?mode=voice"
-              aria-label="New sale with voice"
-            >
-              <Mic aria-hidden="true" size={21} />
-            </Link>
-            <Link className="input-mode-button" to="/sales/new" aria-label="New sale with text">
-              <Keyboard aria-hidden="true" size={21} />
-            </Link>
-          </div>
-        </div>
-        <Button
-          className="sales-filter-toggle"
-          type="button"
-          variant="secondary"
-          aria-expanded={filtersOpen}
-          aria-controls="sales-filter-panel"
-          onClick={() => setFiltersOpen((open) => !open)}
-        >
-          <ListFilter aria-hidden="true" size={17} />
-          Filter
-          {hasFilters && (
-            <span className="sales-filter-toggle__status" aria-label="Filters applied" />
-          )}
-          <ChevronDown
-            aria-hidden="true"
-            className={
-              filtersOpen ? 'sales-filter-toggle__chevron is-open' : 'sales-filter-toggle__chevron'
-            }
-            size={15}
-          />
-        </Button>
-      </div>
-
       {analytics.isError && (
         <Alert tone="warning" icon={<AlertCircle aria-hidden="true" size={18} />}>
           Sales records are available, but summary figures could not be loaded.
@@ -140,6 +101,33 @@ export function SalesListPage() {
           label="Unpaid sale balance"
           value={analytics.data ? formatNaira.format(analytics.data.unpaidBalance) : '—'}
         />
+      </div>
+
+      <div className="sales-control-toolbar" aria-label="Sales actions">
+        <div className="input-mode-action" aria-label="New sale options">
+          <span className="input-mode-action__label">New sale</span>
+          <div className="input-mode-switcher" aria-label="Choose new sale input method">
+            <Link className="input-mode-button input-mode-button--primary" to="/sales/new?mode=voice" aria-label="New sale with voice">
+              <Mic aria-hidden="true" size={21} />
+            </Link>
+            <Link className="input-mode-button" to="/sales/new" aria-label="New sale with text">
+              <Keyboard aria-hidden="true" size={21} />
+            </Link>
+          </div>
+        </div>
+        <Button
+          className="sales-filter-toggle"
+          type="button"
+          variant="secondary"
+          aria-expanded={filtersOpen}
+          aria-controls="sales-filter-panel"
+          onClick={() => setFiltersOpen((open) => !open)}
+        >
+          <ListFilter aria-hidden="true" size={17} />
+          Filter
+          {hasFilters && <span className="sales-filter-toggle__status" aria-label="Filters applied" />}
+          <ChevronDown aria-hidden="true" className={filtersOpen ? 'sales-filter-toggle__chevron is-open' : 'sales-filter-toggle__chevron'} size={15} />
+        </Button>
       </div>
 
       <Surface className="sales-panel">

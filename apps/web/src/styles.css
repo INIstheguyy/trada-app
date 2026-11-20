@@ -1267,7 +1267,7 @@ html.access-viewport-locked #root {
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
 }
@@ -1870,7 +1870,7 @@ html.access-viewport-locked #root {
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
 }
@@ -2337,9 +2337,9 @@ html.access-viewport-locked #root {
   gap: 5px;
 }
 .input-mode-action {
-  display: grid;
-  justify-items: center;
-  gap: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .input-mode-action__label {
   color: var(--sd-text-secondary);

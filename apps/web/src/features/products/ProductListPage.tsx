@@ -80,62 +80,6 @@ export function ProductListPage() {
         description="Find products, review stock levels and keep selling details accurate."
       />
 
-      <div className="inventory-control-toolbar" aria-label="Inventory actions">
-        {can(role, 'product:create') && (
-          <>
-            <div className="input-mode-action" aria-label="New product options">
-              <span className="input-mode-action__label">New product</span>
-              <div className="input-mode-switcher" aria-label="Choose new product input method">
-                <Link
-                  className="input-mode-button input-mode-button--primary"
-                  to="/products/new?mode=voice"
-                  aria-label="New product with voice"
-                >
-                  <Mic aria-hidden="true" size={21} />
-                </Link>
-                <Link
-                  className="input-mode-button"
-                  to="/products/new?mode=image"
-                  aria-label="New product with image"
-                >
-                  <Camera aria-hidden="true" size={21} />
-                </Link>
-                <Link
-                  className="input-mode-button"
-                  to="/products/new"
-                  aria-label="New product with text"
-                >
-                  <Keyboard aria-hidden="true" size={21} />
-                </Link>
-              </div>
-            </div>
-          </>
-        )}
-        <Button
-          className="inventory-filter-toggle"
-          type="button"
-          variant="secondary"
-          aria-expanded={filtersOpen}
-          aria-controls="inventory-filter-panel"
-          onClick={() => setFiltersOpen((open) => !open)}
-        >
-          <SlidersHorizontal aria-hidden="true" size={17} />
-          Filter
-          {hasFilters && (
-            <span className="inventory-filter-toggle__status" aria-label="Filters applied" />
-          )}
-          <ChevronDown
-            aria-hidden="true"
-            className={
-              filtersOpen
-                ? 'inventory-filter-toggle__chevron is-open'
-                : 'inventory-filter-toggle__chevron'
-            }
-            size={15}
-          />
-        </Button>
-      </div>
-
       <div className="inventory-summary" aria-label="Inventory summary">
         <StatCard label="Total products" value={data ? String(data.pagination.total) : '—'} />
         <StatCard
@@ -178,6 +122,42 @@ export function ProductListPage() {
           <span className="low-stock-strip__label">At or below threshold</span>
         </Surface>
       ) : null}
+
+      <div className="inventory-control-toolbar" aria-label="Inventory actions">
+        {can(role, 'product:create') && (
+          <div className="input-mode-action" aria-label="New product options">
+            <span className="input-mode-action__label">New product</span>
+            <div className="input-mode-switcher" aria-label="Choose new product input method">
+              <Link className="input-mode-button input-mode-button--primary" to="/products/new?mode=voice" aria-label="New product with voice">
+                <Mic aria-hidden="true" size={21} />
+              </Link>
+              <Link className="input-mode-button" to="/products/new?mode=image" aria-label="New product with image">
+                <Camera aria-hidden="true" size={21} />
+              </Link>
+              <Link className="input-mode-button" to="/products/new" aria-label="New product with text">
+                <Keyboard aria-hidden="true" size={21} />
+              </Link>
+            </div>
+          </div>
+        )}
+        <Button
+          className="inventory-filter-toggle"
+          type="button"
+          variant="secondary"
+          aria-expanded={filtersOpen}
+          aria-controls="inventory-filter-panel"
+          onClick={() => setFiltersOpen((open) => !open)}
+        >
+          <SlidersHorizontal aria-hidden="true" size={17} />
+          Filter
+          {hasFilters && <span className="inventory-filter-toggle__status" aria-label="Filters applied" />}
+          <ChevronDown
+            aria-hidden="true"
+            className={filtersOpen ? 'inventory-filter-toggle__chevron is-open' : 'inventory-filter-toggle__chevron'}
+            size={15}
+          />
+        </Button>
+      </div>
 
       <Surface className="products-panel">
         {filtersOpen && (

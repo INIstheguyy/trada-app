@@ -44,6 +44,7 @@ import {
   fileToDataUrl,
   recordingToDataUrl,
 } from '../../lib/formatters';
+import { getMicrophoneErrorMessage, getSupportedAudioMimeType } from '../../lib/voiceRecording';
 import { BackLink } from '../../components/BackLink';
 import { NumberField, TextField } from '../../components/FormFields';
 
@@ -118,7 +119,8 @@ export function ProductFormPage() {
   const [searchParams] = useSearchParams();
   const user = useAppSelector((state) => state.auth.user);
   const role = normalizeRole(user?.role ?? 'user');
-  const requestedMode = searchParams.get('mode') ?? (searchParams.get('ai') === 'voice' ? 'voice' : 'manual');
+  const requestedMode =
+    searchParams.get('mode') ?? (searchParams.get('ai') === 'voice' ? 'voice' : 'manual');
   const voiceRequested = requestedMode === 'voice';
   const [captureMode, setCaptureMode] = useState<'voice' | 'image' | 'manual'>(
     requestedMode === 'image' ? 'image' : voiceRequested ? 'voice' : 'manual',
@@ -244,10 +246,18 @@ export function ProductFormPage() {
     voiceDraftRequestRef.current = request;
     try {
       const draft = await request.unwrap();
-      if (voiceDraftRequestRef.current !== request || (previewRequestId !== undefined && voicePreviewRequestIdRef.current !== previewRequestId)) return;
+      if (
+        voiceDraftRequestRef.current !== request ||
+        (previewRequestId !== undefined && voicePreviewRequestIdRef.current !== previewRequestId)
+      )
+        return;
       setVoiceDraft(draft);
     } catch (reason) {
-      if (voiceDraftRequestRef.current !== request || (previewRequestId !== undefined && voicePreviewRequestIdRef.current !== previewRequestId)) return;
+      if (
+        voiceDraftRequestRef.current !== request ||
+        (previewRequestId !== undefined && voicePreviewRequestIdRef.current !== previewRequestId)
+      )
+        return;
       setVoiceError(
         readApiError(reason, 'We couldnâ€™t prepare a product draft. Complete the form manually.'),
       );
@@ -268,7 +278,11 @@ export function ProductFormPage() {
   }
 
   async function startVoiceRecording() {
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+    if (
+      window.isSecureContext === false ||
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof MediaRecorder === 'undefined'
+    ) {
       setIsStartingVoice(false);
       setVoiceError(
         'Voice recording requires HTTPS on another device. Type the product description instead.',
@@ -281,10 +295,10 @@ export function ProductFormPage() {
     discardAudioPreview();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : 'audio/webm';
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const mimeType = getSupportedAudioMimeType();
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
       recordingChunksRef.current = [];
       recordingStartedAtRef.current = Date.now();
       setRecordingElapsedSeconds(0);
@@ -295,7 +309,7 @@ export function ProductFormPage() {
       });
       recorder.addEventListener('stop', () => {
         const recording = new Blob(recordingChunksRef.current, {
-          type: recorder.mimeType || mimeType,
+          type: recorder.mimeType || mimeType || 'audio/webm',
         });
         mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
         mediaStreamRef.current = null;
@@ -320,15 +334,22 @@ export function ProductFormPage() {
           mimeType: recording.type || 'audio/webm',
           url,
         });
-        prepareCapturedAudio(recording, durationSeconds, recording.type || 'audio/webm');
+        prepareCapturedAudio(
+          recording,
+          durationSeconds,
+          recording.type || mimeType || 'audio/webm',
+        );
       });
-      recorder.start();
+      recorder.start(1_000);
       setIsStartingVoice(false);
       setIsRecordingVoice(true);
-    } catch {
+    } catch (error) {
       setIsStartingVoice(false);
       setVoiceError(
-        'We could not access your microphone. Allow microphone access or type the product description instead.',
+        getMicrophoneErrorMessage(
+          error,
+          'We could not access your microphone. Allow microphone access or type the product description instead.',
+        ),
       );
     }
   }
@@ -594,10 +615,10 @@ export function ProductFormPage() {
           isEditing
             ? 'Update the selling details and stock information recorded for this product.'
             : captureMode === 'voice'
-                ? 'Describe the product and let Trada prepare an editable draft.'
-                : captureMode === 'image'
-                  ? 'Use a product or package image to prepare an editable draft.'
-                  : 'Review the information needed to identify, price and track this product.'
+              ? 'Describe the product and let Trada prepare an editable draft.'
+              : captureMode === 'image'
+                ? 'Use a product or package image to prepare an editable draft.'
+                : 'Review the information needed to identify, price and track this product.'
         }
       />
 
@@ -639,7 +660,9 @@ export function ProductFormPage() {
                 </li>
               </ol>
               <div className="focused-capture__hero">
-                <span className={`focused-capture__orb${isRecordingVoice || isStartingVoice ? ' is-listening' : ''}`}>
+                <span
+                  className={`focused-capture__orb${isRecordingVoice || isStartingVoice ? ' is-listening' : ''}`}
+                >
                   {isRecordingVoice ? (
                     <Square aria-hidden="true" size={28} fill="currentColor" />
                   ) : (
@@ -652,20 +675,20 @@ export function ProductFormPage() {
                       ? `Recording starts in ${voiceCountdown}`
                       : isStartingVoice
                         ? 'Starting your microphone'
-                      : isRecordingVoice
-                        ? 'Listening to your product'
-                        : voiceDraftState.isLoading
-                          ? 'Transcribing your product'
-                          : 'Describe the product'}
+                        : isRecordingVoice
+                          ? 'Listening to your product'
+                          : voiceDraftState.isLoading
+                            ? 'Transcribing your product'
+                            : 'Describe the product'}
                   </h2>
                   <p>
                     {voiceCountdown !== null
                       ? 'Get ready to speak naturally when the countdown finishes.'
                       : isStartingVoice
                         ? 'Allow microphone access if your browser asks for permission.'
-                      : isRecordingVoice
-                        ? 'Include its name, price, stock quantity and location.'
-                        : 'Speak naturally. Trada prepares an editable draft; nothing is saved yet.'}
+                        : isRecordingVoice
+                          ? 'Include its name, price, stock quantity and location.'
+                          : 'Speak naturally. Trada prepares an editable draft; nothing is saved yet.'}
                   </p>
                 </div>
                 {voiceCountdown === null && !isStartingVoice && !isRecordingVoice && (
@@ -685,10 +708,17 @@ export function ProductFormPage() {
                 <Button
                   type="button"
                   loading={
-                    voiceDraftState.isLoading && !isStartingVoice && !isRecordingVoice && voiceCountdown === null
+                    voiceDraftState.isLoading &&
+                    !isStartingVoice &&
+                    !isRecordingVoice &&
+                    voiceCountdown === null
                   }
                   disabled={voiceCountdown !== null || isStartingVoice}
-                  onClick={() => (isRecordingVoice ? stopVoiceRecording() : chooseVoiceCapture())}
+                  onClick={() => {
+                    if (isRecordingVoice) stopVoiceRecording();
+                    else if (voiceError) void startVoiceRecording();
+                    else chooseVoiceCapture();
+                  }}
                   icon={
                     isRecordingVoice ? (
                       <Square aria-hidden="true" size={16} fill="currentColor" />
@@ -701,16 +731,18 @@ export function ProductFormPage() {
                     ? `Starting in ${voiceCountdown}`
                     : isStartingVoice
                       ? 'Starting microphone'
-                    : isRecordingVoice
-                      ? 'Stop and transcribe'
-                      : 'Record again'}
+                      : isRecordingVoice
+                        ? 'Stop and transcribe'
+                        : voiceError
+                          ? 'Tap to enable microphone'
+                          : 'Record again'}
                 </Button>
                 <small>
                   {isStartingVoice
                     ? 'Waiting for microphone access.'
                     : isRecordingVoice
-                    ? `Recording ${formatRecordingDuration(recordingElapsedSeconds)} â€” tap stop when finished.`
-                    : 'The AI only prepares a draft. It cannot create a product from this action.'}
+                      ? `Recording ${formatRecordingDuration(recordingElapsedSeconds)} â€” tap stop when finished.`
+                      : 'The AI only prepares a draft. It cannot create a product from this action.'}
                 </small>
               </div>
               {audioPreview && (

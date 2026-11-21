@@ -17,6 +17,7 @@ import {
   formatRecordingDuration,
   recordingToDataUrl,
 } from '../../lib/formatters';
+import { getMicrophoneErrorMessage, getSupportedAudioMimeType } from '../../lib/voiceRecording';
 import { BackLink } from '../../components/BackLink';
 import { TextField } from '../../components/FormFields';
 import { readApiError } from '../../lib/apiError';
@@ -205,10 +206,18 @@ export function SaleCheckoutPage() {
     voiceDraftRequestRef.current = request;
     try {
       const draft = await request.unwrap();
-      if (voiceDraftRequestRef.current !== request || (previewRequestId !== undefined && voicePreviewRequestIdRef.current !== previewRequestId)) return;
+      if (
+        voiceDraftRequestRef.current !== request ||
+        (previewRequestId !== undefined && voicePreviewRequestIdRef.current !== previewRequestId)
+      )
+        return;
       setVoiceDraft(draft);
     } catch (reason) {
-      if (voiceDraftRequestRef.current !== request || (previewRequestId !== undefined && voicePreviewRequestIdRef.current !== previewRequestId)) return;
+      if (
+        voiceDraftRequestRef.current !== request ||
+        (previewRequestId !== undefined && voicePreviewRequestIdRef.current !== previewRequestId)
+      )
+        return;
       setVoiceError(
         readApiError(
           reason,
@@ -221,7 +230,11 @@ export function SaleCheckoutPage() {
   }
 
   async function startVoiceRecording() {
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+    if (
+      window.isSecureContext === false ||
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof MediaRecorder === 'undefined'
+    ) {
       setIsStartingVoice(false);
       setVoiceError(
         'Voice recording is not supported in this browser. Type the sale description instead.',
@@ -235,10 +248,10 @@ export function SaleCheckoutPage() {
     discardAudioPreview();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const preferredMimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : 'audio/webm';
-      const recorder = new MediaRecorder(stream, { mimeType: preferredMimeType });
+      const preferredMimeType = getSupportedAudioMimeType();
+      const recorder = preferredMimeType
+        ? new MediaRecorder(stream, { mimeType: preferredMimeType })
+        : new MediaRecorder(stream);
       recordedAudioChunksRef.current = [];
       recordingStartedAtRef.current = Date.now();
       setRecordingElapsedSeconds(0);
@@ -249,7 +262,7 @@ export function SaleCheckoutPage() {
         if (event.data.size > 0) recordedAudioChunksRef.current.push(event.data);
       });
       recorder.addEventListener('stop', () => {
-        const mimeType = recorder.mimeType || preferredMimeType;
+        const mimeType = recorder.mimeType || preferredMimeType || 'audio/webm';
         const recording = new Blob(recordedAudioChunksRef.current, { type: mimeType });
         mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
         mediaStreamRef.current = null;
@@ -276,13 +289,16 @@ export function SaleCheckoutPage() {
         });
         prepareCapturedAudio(recording, durationSeconds, recording.type || 'audio/webm');
       });
-      recorder.start();
+      recorder.start(1_000);
       setIsStartingVoice(false);
       setIsRecordingVoice(true);
-    } catch {
+    } catch (error) {
       setIsStartingVoice(false);
       setVoiceError(
-        'We could not access your microphone. Allow microphone access or type the sale description instead.',
+        getMicrophoneErrorMessage(
+          error,
+          'We could not access your microphone. Allow microphone access or type the sale description instead.',
+        ),
       );
     }
   }
@@ -430,8 +446,8 @@ export function SaleCheckoutPage() {
         title="Record a sale"
         description={
           captureMode === 'voice'
-              ? 'Speak naturally and let Trada prepare a sale draft for you to review.'
-              : 'Review the cart, payment received and any outstanding balance before saving.'
+            ? 'Speak naturally and let Trada prepare a sale draft for you to review.'
+            : 'Review the cart, payment received and any outstanding balance before saving.'
         }
       />
       <form
@@ -475,20 +491,20 @@ export function SaleCheckoutPage() {
                         ? `Recording starts in ${voiceCountdown}`
                         : isStartingVoice
                           ? 'Starting your microphone'
-                        : isRecordingVoice
-                          ? 'Listening to your sale'
-                          : voiceDraftState.isLoading
-                            ? 'Transcribing your sale'
-                            : 'Tell Trada about the sale'}
+                          : isRecordingVoice
+                            ? 'Listening to your sale'
+                            : voiceDraftState.isLoading
+                              ? 'Transcribing your sale'
+                              : 'Tell Trada about the sale'}
                     </h2>
                     <p>
                       {voiceCountdown !== null
                         ? 'Get ready to speak naturally when the countdown finishes.'
                         : isStartingVoice
                           ? 'Allow microphone access if your browser asks for permission.'
-                        : isRecordingVoice
-                          ? 'Include the product, quantity, payment method and customer name.'
-                          : 'Speak naturally. Trada prepares an editable draft; nothing is recorded yet.'}
+                          : isRecordingVoice
+                            ? 'Include the product, quantity, payment method and customer name.'
+                            : 'Speak naturally. Trada prepares an editable draft; nothing is recorded yet.'}
                     </p>
                   </div>
                   {voiceCountdown === null && !isStartingVoice && !isRecordingVoice && (
@@ -508,10 +524,17 @@ export function SaleCheckoutPage() {
                   <Button
                     type="button"
                     loading={
-                      voiceDraftState.isLoading && !isStartingVoice && !isRecordingVoice && voiceCountdown === null
+                      voiceDraftState.isLoading &&
+                      !isStartingVoice &&
+                      !isRecordingVoice &&
+                      voiceCountdown === null
                     }
                     disabled={voiceCountdown !== null || isStartingVoice}
-                    onClick={() => (isRecordingVoice ? stopVoiceRecording() : chooseVoiceCapture())}
+                    onClick={() => {
+                      if (isRecordingVoice) stopVoiceRecording();
+                      else if (voiceError) void startVoiceRecording();
+                      else chooseVoiceCapture();
+                    }}
                     icon={
                       isRecordingVoice ? (
                         <Square aria-hidden="true" size={16} fill="currentColor" />
@@ -524,16 +547,18 @@ export function SaleCheckoutPage() {
                       ? `Starting in ${voiceCountdown}`
                       : isStartingVoice
                         ? 'Starting microphone'
-                      : isRecordingVoice
-                        ? 'Stop and transcribe'
-                        : 'Record again'}
+                        : isRecordingVoice
+                          ? 'Stop and transcribe'
+                          : voiceError
+                            ? 'Tap to enable microphone'
+                            : 'Record again'}
                   </Button>
                   <small>
                     {isStartingVoice
                       ? 'Waiting for microphone access.'
                       : isRecordingVoice
-                      ? `Recording ${formatRecordingDuration(recordingElapsedSeconds)} â€” tap stop when you have finished speaking.`
-                      : 'AI drafts do not create a sale. Review before using any detail below.'}
+                        ? `Recording ${formatRecordingDuration(recordingElapsedSeconds)} â€” tap stop when you have finished speaking.`
+                        : 'AI drafts do not create a sale. Review before using any detail below.'}
                   </small>
                 </div>
                 {audioPreview && (

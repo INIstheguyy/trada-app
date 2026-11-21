@@ -2,7 +2,7 @@
 
 **Coverage:** Phase One and Phase Two, with explicitly separated future vision  
 **Document type:** Product requirements context and business/product analysis — **not a technical requirements specification**  
-**Version:** 1.1 | **Prepared:** 3 November 2026 | **Implementation status updated:** 20 November 2026
+**Version:** 1.1 | **Prepared:** 3 November 2026 | **Implementation status updated:** 21 November 2026
 **Intended use:** Source context for a separate technical requirements, design system, UX, and engineering planning exercise.
 
 > **Important:** This compilation consolidates the decisions, product directions, concepts and suggestions developed in the Trada conversations. A feature being discussed does not mean it has been approved, built, or committed to Phase One. The Phase One/Phase Two split below is a **recommended consolidation** of our evolving scope, not a formally signed-off release contract. This distinction matters because previous conversations used terms such as MVP, V2, “next,” and “later” at different times.
@@ -794,7 +794,7 @@ At the end of every substantive delivery session, the team should update:
 | Products and low-stock alerts     | **Implemented and verified**     | Searchable/paginated list, low-stock summary, create, detail/edit and guarded delete routes are implemented against the documented contract. Live backend testing was intentionally deferred.                                                                                                                                            |
 | Sales and sales analytics         | **Implemented and verified**     | Protected checkout, filtered/paginated history, detail, guarded cancellation/restock and analytics are implemented against the documented contract. Revenue, received amount and balance due remain distinct. Live backend testing was intentionally deferred.                                                                           |
 | Full production RBAC              | **Blocked by decision/contract** | Backend documentation exposes a generic `user` role but no staff membership, permission, branch, approval or authorization-denied contract.                                                                                                                                                                                              |
-| AI capture and draft review       | **Partially defined**            | Sales and Products expose their available Voice, Image and/or Text input controls directly in their module action bars; each control routes straight to its matching input stage. Voice selection shows an animated waveform and a three-second countdown before requesting microphone access; after recording stops, its completed audio is sent for a draft request. Text opens only the existing editable form. Product image selection opens an `environment` camera capture on supporting mobile browsers and the normal file picker on desktop. Applying an AI draft opens the existing editable form, and persistence still requires the normal explicit submit action. The mobile centre launcher routes permitted users to these focused draft-only workflows; product-update suggestions remain separately guarded. Unified AI, live transcription, confidence, idempotency, inventory authorization/audit and production release gates remain unresolved. |
+| AI capture and draft review       | **Partially defined**            | Sales and Products expose their available Voice, Image and/or Text input controls directly in their module action bars; each control routes straight to its matching input stage. Voice selection shows an animated waveform and a three-second countdown before requesting microphone access; it negotiates WebM, MP4/AAC or Ogg where supported, then sends the recorded audio for a draft request. A blocked delayed request offers a direct tap-to-enable retry for browsers that require a user gesture. Text opens only the existing editable form. Product image selection opens an `environment` camera capture on supporting mobile browsers and the normal file picker on desktop. Applying an AI draft opens the existing editable form, and persistence still requires the normal explicit submit action. The mobile centre launcher routes permitted users to these focused draft-only workflows; product-update suggestions remain separately guarded. Unified AI, live transcription, confidence, idempotency, inventory authorization/audit and production release gates remain unresolved. |
 | Expenses, purchases and suppliers | **Planned**                      | Required by the PRD but not present in the received backend contract.                                                                                                                                                                                                                                                                    |
 | Storefront and marketing          | **Planned**                      | Required direction, but no received backend contract yet.                                                                                                                                                                                                                                                                                |
 
@@ -2516,3 +2516,24 @@ These items require clarification before the frontend treats the backend as the 
 **Delivery risks and limitations:** `capture="environment"` is a browser hint, not a guarantee that every mobile device opens a rear camera. Camera, microphone and permission behavior still require live iOS, Android and desktop smoke testing. Noisy environments and unsupported recording APIs continue to require the manual and typed alternatives.
 
 **Next session target:** Perform cross-browser device QA with microphone and camera permissions, then consider extracting the duplicated recorder lifecycle into the existing shared hook without changing capture behavior.
+
+### Session 071 — Cross-browser mobile voice recording resilience
+
+**Date:** 21 November 2026
+**Outcome:** Voice capture no longer forces a WebM recording on devices that do not support it, and users can retry microphone permission from a direct tap.
+
+**Completed:**
+
+- Added recorder format negotiation across sale, product and shared voice capture: WebM/Opus where available, MP4/AAC for Safari/iOS, Ogg where available, and the browser default if no type is advertised.
+- Started recorders with periodic data delivery so mobile browsers retain recorded chunks reliably until the merchant stops recording.
+- Added secure-context detection and useful browser/device-specific microphone errors (permission blocked, no mic, mic busy, insecure HTTP and unsupported recording).
+- Changed the post-failure action to **Tap to enable microphone**, which retries immediately inside a user gesture instead of placing a second delayed countdown between the merchant and the permission request.
+- Added unit coverage for Safari-compatible MP4 selection and the safe browser-default fallback.
+
+**Verification:** Prettier completed for all changed source files. TypeScript passed. Focused voice compatibility, sale capture and product capture tests passed (8 tests across 3 files).
+
+**Backend contract gap:** The received voice API documentation describes `audio/webm`. The frontend now correctly preserves the browser-selected MIME type in the data URL and request metadata, but the voice-processing service must accept and transcode `audio/mp4` (and ideally Ogg) for iOS/Safari and broad browser support. This remains an integration acceptance criterion.
+
+**Delivery risks and limitations:** HTTPS remains mandatory for microphone access outside localhost. Some embedded in-app browsers can disable `MediaRecorder` entirely; typed input remains available. Real-device validation is still required for current iOS Safari, Android Chrome, Samsung Internet, desktop Chrome/Edge/Firefox and installed PWA contexts.
+
+**Next session target:** Validate supported MIME upload and transcription behavior against the deployed voice endpoint on representative iOS and Android devices, then record the backend acceptance results.

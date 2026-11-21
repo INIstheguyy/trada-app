@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { getMicrophoneErrorMessage, getSupportedAudioMimeType } from './voiceRecording';
 
 type VoiceRecordingPreview = {
   blob: Blob;
@@ -58,7 +59,11 @@ export function useVoiceRecording(options?: {
   }
 
   async function start() {
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+    if (
+      window.isSecureContext === false ||
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof MediaRecorder === 'undefined'
+    ) {
       setError(noSupportMsg);
       return;
     }
@@ -67,10 +72,10 @@ export function useVoiceRecording(options?: {
     discard();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const preferredMimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : 'audio/webm';
-      const recorder = new MediaRecorder(stream, { mimeType: preferredMimeType });
+      const preferredMimeType = getSupportedAudioMimeType();
+      const recorder = preferredMimeType
+        ? new MediaRecorder(stream, { mimeType: preferredMimeType })
+        : new MediaRecorder(stream);
       chunksRef.current = [];
       startedAtRef.current = Date.now();
       setElapsed(0);
@@ -81,7 +86,7 @@ export function useVoiceRecording(options?: {
         if (event.data.size > 0) chunksRef.current.push(event.data);
       });
       recorder.addEventListener('stop', () => {
-        const mimeType = recorder.mimeType || preferredMimeType;
+        const mimeType = recorder.mimeType || preferredMimeType || 'audio/webm';
         const recording = new Blob(chunksRef.current, { type: mimeType });
         mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
         mediaStreamRef.current = null;
@@ -105,10 +110,10 @@ export function useVoiceRecording(options?: {
           url,
         });
       });
-      recorder.start();
+      recorder.start(1_000);
       setIsRecording(true);
-    } catch {
-      setError(noMicMsg);
+    } catch (error) {
+      setError(getMicrophoneErrorMessage(error, noMicMsg));
     }
   }
 
